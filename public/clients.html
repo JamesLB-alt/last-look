@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Last Look · Clients</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237d5cff'/%3E%3Cpath d='M5.5 16C9 10.6 12.4 8.6 16 8.6S23 10.6 26.5 16C23 21.4 19.6 23.4 16 23.4S9 21.4 5.5 16Z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='4.4' fill='white'/%3E%3Ccircle cx='17.5' cy='14.6' r='1.5' fill='%236a46ee'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/theme.css" />
+<style>
+  .hero { grid-template-columns: 1.15fr .85fr; padding-bottom: 20px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stats .float { position: static; min-width: 0; }
+  .stats .float:first-child { grid-column: 1 / -1; }
+
+  .layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; margin: 20px 0 90px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+  /* clients list */
+  .clients { display: flex; flex-direction: column; gap: 8px; }
+  .client { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; text-align: left; height: auto; font: inherit; width: 100%; white-space: normal; }
+  .client.sel { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--accent-tint); }
+  .client canvas { width: 36px; height: 36px; border-radius: 10px; flex: none; }
+  .client .grow { flex: 1; min-width: 0; }
+  .client .n { font-weight: 600; display: block; }
+  .client .s { font-size: 12.5px; color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .score-pill { font: 600 13px var(--sans); min-width: 40px; text-align: center; padding: 4px 10px; border-radius: 99px; background: var(--panel-3); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .score-pill.good { color: var(--allow); background: var(--allow-tint); }
+  .score-pill.mid { color: var(--ask); background: var(--ask-tint); }
+  .score-pill.bad { color: var(--block); background: var(--block-tint); }
+  form { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .form-err { color: var(--block); font-size: 13px; min-height: 1em; }
+
+  /* report */
+  .report-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .report-head h2 { margin: 0; font-weight: 500; font-size: 30px; letter-spacing: -.035em; }
+  .report-head .path { font: 400 12.5px var(--mono); color: var(--muted); overflow-wrap: anywhere; margin-top: 2px; }
+  .report-head .btns { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .scores { display: grid; grid-template-columns: 170px repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 20px; }
+  @media (max-width: 1150px) { .scores { grid-template-columns: repeat(3, minmax(0, 1fr)); } .overall { grid-column: 1 / -1; } }
+  @media (max-width: 520px) { .scores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .facet { display: block; text-align: left; height: auto; padding: 14px 16px; border-radius: 18px; background: var(--panel-2); border: 1px solid var(--line); font: inherit; color: inherit; white-space: normal; }
+  .facet.sel { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--accent-tint); }
+  .facet .fs { font-size: 30px; font-weight: 600; letter-spacing: -.035em; font-variant-numeric: tabular-nums; margin: 4px 0 4px; line-height: 1.1; }
+  .facet .fs.na { color: var(--dim); font-size: 20px; }
+  .facet .cnt { display: flex; flex-wrap: wrap; gap: 2px 8px; font: 600 11.5px var(--sans); color: var(--muted); }
+  .facet .cnt span { white-space: nowrap; }
+  .overall { display: flex; align-items: center; gap: 14px; }
+  .c-crit { color: var(--block); } .c-high { color: var(--ask); } .c-med { color: var(--med); }
+
+  .summary { margin-top: 16px; padding: 18px 20px; border-radius: 18px; background: var(--accent-tint); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+  .summary p { margin: 8px 0 0; white-space: pre-wrap; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 10px; }
+
+  .findings-head { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 10px; gap: 10px; flex-wrap: wrap; }
+  .findings { display: flex; flex-direction: column; gap: 10px; }
+  .finding { border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; background: var(--panel-2); position: relative; overflow: hidden; }
+  .finding::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--dim); }
+  .finding.critical { background: linear-gradient(90deg, var(--block-tint), var(--panel-2) 70%); border-color: color-mix(in srgb, var(--block) 20%, transparent); }
+  .finding.critical::before { background: var(--block); }
+  .finding.high::before { background: var(--ask); }
+  .finding.medium::before { background: var(--med); }
+  .f-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .sev { font: 600 11px var(--sans); letter-spacing: .1em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; }
+  .sev.critical { color: var(--block); background: var(--block-tint); }
+  .sev.high { color: var(--ask); background: var(--ask-tint); }
+  .sev.medium { color: var(--med); background: color-mix(in srgb, var(--med) 14%, transparent); }
+  .f-title { font-weight: 600; font-size: 16px; }
+  .f-facet { margin-left: auto; }
+  .f-loc { font: 400 12.5px var(--mono); color: var(--muted); margin-top: 8px; }
+  pre { margin: 8px 0 0; padding: 11px 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; font: 400 12.5px/1.5 var(--mono); overflow-x: auto; white-space: pre; }
+  .f-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; font-size: 13.5px; }
+  @media (max-width: 700px) { .f-body { grid-template-columns: 1fr; } }
+  .f-body .label { display: block; margin-bottom: 3px; }
+  .f-body .why { color: var(--muted); }
+  .clean { text-align: center; padding: 30px 16px; border-radius: 18px; background: var(--allow-tint); color: var(--allow); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="announce"><div class="wrap"><span class="dot on"></span><span><b>Code Guard.</b><span class="long"> Crypto-specific security checks across a client's whole stack, with every secret redacted.</span></span><a href="/firewall.html">Open the agent firewall →</a></div></div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="wordmark" href="/"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9b7dff"/><stop offset="1" stop-color="#5b36e0"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#mk)"/><path d="M5.5 16C9 10.6 12.4 8.6 16 8.6S23 10.6 26.5 16C23 21.4 19.6 23.4 16 23.4S9 21.4 5.5 16Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><circle cx="16" cy="16" r="4.4" fill="#fff"/><circle cx="17.5" cy="14.6" r="1.5" fill="#6a46ee"/></svg>Last Look</a>
+    <nav class="pills" aria-label="Sections">
+      <a href="/personal.html"><span class="long">For individuals</span><span class="short">Individuals</span></a>
+      <a href="/firewall.html" aria-current="page"><span class="long">For business</span><span class="short">Business</span></a>
+    </nav>
+  </div>
+</header>
+<div class="wrap subnav"><nav class="tabs" aria-label="Business tools"><a href="/firewall.html">Agent firewall</a><a href="/clients.html" aria-current="page" class="sel">Code Guard</a></nav></div>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <div class="label">Code Guard · AI security for crypto codebases</div>
+      <h1>Find every way a client could <em class="accent">lose funds</em> before an attacker does.</h1>
+      <p class="lede">Frontend, backend, cloud & CI, AI agents and on-chain code, checked for leaked keys, unlimited approvals, agents holding signing keys and secrets in pipelines. Every finding points to a real file and line, and Claude turns the report into a fix plan.</p>
+    </div>
+    <div class="stats" aria-label="Portfolio">
+      <div class="float"><div class="label">Clients guarded</div><div class="v" id="s-clients">0</div><div class="s" id="s-scanned">none scanned yet</div></div>
+      <div class="float"><div class="label">Critical findings</div><div class="v bad" id="s-critical">0</div><div class="s">across all clients</div></div>
+      <div class="float"><div class="label">Most at risk</div><div class="v" id="s-worst">—</div><div class="s" id="s-worst-s">scan a client</div></div>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside class="card" aria-label="Clients">
+      <div class="label" style="margin-bottom:12px">Clients</div>
+      <div class="clients" id="clients"></div>
+      <form id="add">
+        <div class="label">Add a client</div>
+        <input id="add-name" placeholder="Company name" autocomplete="off" required />
+        <input id="add-path" class="mono" placeholder="/path/to/their/repo" autocomplete="off" required />
+        <button class="primary" type="submit">Add client</button>
+        <div class="form-err" id="add-err" role="alert"></div>
+      </form>
+    </aside>
+
+    <section class="card" id="report" aria-live="polite"></section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const tone = (s) => s >= 85 ? "good" : s >= 50 ? "mid" : "bad";
+const FACET_LABEL = { frontend: "Frontend", backend: "Backend", cloud: "Cloud & CI", agent: "AI agents", onchain: "On-chain" };
+
+let clients = [], selected = null, facetFilter = "all", busy = null;
+
+function avatar(canvas, seed) {
+  let h = 2166136261;
+  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const ctx = canvas.getContext("2d"), s = canvas.width / 5;
+  ctx.fillStyle = `hsl(${(h >>> 0) % 360} 30% 18%)`; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = `hsl(${((h >>> 0) % 360 + 40) % 360} 70% 66%)`;
+  for (let y = 0; y < 5; y++) for (let x = 0; x < 3; x++)
+    if ((h >>> ((y * 3 + x) % 31)) & 1) { ctx.fillRect(x * s, y * s, s, s); ctx.fillRect((4 - x) * s, y * s, s, s); }
+}
+
+function renderStats() {
+  const scanned = clients.filter((c) => c.report);
+  $("s-clients").textContent = clients.length;
+  $("s-scanned").textContent = scanned.length ? `${scanned.length} scanned` : "none scanned yet";
+  $("s-critical").textContent = scanned.reduce((n, c) => n + c.report.findings.filter((f) => f.severity === "critical").length, 0);
+  const worst = scanned.sort((a, b) => a.report.score - b.report.score)[0];
+  $("s-worst").textContent = worst ? worst.name : "—";
+  $("s-worst").className = "v " + (worst ? tone(worst.report.score) : "");
+  $("s-worst-s").textContent = worst ? `score ${worst.report.score} / 100` : "scan a client";
+}
+
+function renderClients() {
+  $("clients").innerHTML = clients.map((c) => `
+    <button class="client ${c.id === selected ? "sel" : ""}" data-id="${esc(c.id)}">
+      <canvas width="36" height="36" data-seed="${esc(c.name)}"></canvas>
+      <span class="grow"><span class="n">${esc(c.name)}</span><span class="s">${esc(c.note)}</span></span>
+      <span class="score-pill ${c.report ? tone(c.report.score) : ""}">${c.report ? c.report.score : "—"}</span>
+    </button>`).join("");
+  document.querySelectorAll(".client canvas").forEach((cv) => avatar(cv, cv.dataset.seed));
+  renderStats();
+}
+
+function ring(score) {
+  const c = 2 * Math.PI * 28, color = `var(--${score >= 85 ? "allow" : score >= 50 ? "ask" : "block"})`;
+  return `<div class="ring" style="width:68px;height:68px"><svg width="68" height="68" viewBox="0 0 68 68"><circle cx="34" cy="34" r="28" fill="none" stroke="var(--line-2)" stroke-width="7"/>
+    <circle cx="34" cy="34" r="28" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - score / 100)}"/></svg><div class="val"><b style="font-size:21px">${score}</b></div></div>`;
+}
+
+function renderReport() {
+  const c = clients.find((x) => x.id === selected);
+  if (!c) { $("report").innerHTML = `<div class="empty">Pick a client to see its report.</div>`; return; }
+  const r = c.report;
+  const head = `
+    <div class="report-head">
+      <div><h2>${esc(c.name)}</h2><div class="path">${esc(c.path)}</div></div>
+      <div class="btns">
+        <button class="primary sm" data-act="scan" ${busy ? "disabled" : ""}>${busy === "scan" ? "Scanning…" : r ? "Rescan" : "Scan now"}</button>
+        <button class="sm" data-act="explain" ${!r || busy ? "disabled" : ""}>${busy === "explain" ? "Asking Claude…" : "Explain with Claude"}</button>
+      </div>
+    </div>`;
+  if (!r) { $("report").innerHTML = head + `<div class="empty" style="margin-top:18px">Not scanned yet. Scanning reads committed files only (it respects .gitignore) and never shows secret values.</div>`; return; }
+
+  const facets = r.facets.map((f) => `
+    <button class="facet ${facetFilter === f.id ? "sel" : ""}" data-facet="${f.id}" title="${esc(f.blurb)}">
+      <span class="label">${esc(f.label)}</span>
+      ${f.files ? `<div class="fs ${tone(f.score)}">${f.score}</div>` : `<div class="fs na">n/a</div>`}
+      <div class="cnt">${f.files ? `<span class="c-crit">${f.counts.critical} crit</span><span class="c-high">${f.counts.high} high</span><span class="c-med">${f.counts.medium} med</span>` : "no files"}</div>
+    </button>`).join("");
+
+  const shown = r.findings.filter((f) => facetFilter === "all" || f.facet === facetFilter);
+  const findings = shown.length ? shown.map((f) => `
+    <article class="finding ${f.severity}">
+      <div class="f-top"><span class="sev ${f.severity}">${f.severity}</span><span class="f-title">${esc(f.title)}</span><span class="chip f-facet">${esc(FACET_LABEL[f.facet])}</span></div>
+      <div class="f-loc">${esc(f.file)}:${f.line}</div>
+      <pre>${esc(f.snippet)}</pre>
+      <div class="f-body"><div><span class="label">Why it matters</span><span class="why">${esc(f.why)}</span></div><div><span class="label">Fix</span><span>${esc(f.fix)}</span></div></div>
+    </article>`).join("")
+    : r.findings.length ? `<div class="empty">No findings in ${esc(FACET_LABEL[facetFilter])}.</div>`
+    : `<div class="clean">No crypto-specific risks found in ${r.files} files.</div>`;
+
+  $("report").innerHTML = head + `
+    <div class="scores">
+      <button class="facet overall ${facetFilter === "all" ? "sel" : ""}" data-facet="all">${ring(r.score)}<span><span class="label">Overall</span><span class="note" style="display:block;margin:2px 0 0">${r.files} files · ${r.findings.length} findings</span></span></button>
+      ${facets}
+    </div>
+    ${c.summary ? `<div class="summary"><div class="label">Claude · executive summary</div><p>${esc(c.summary)}</p></div>` : ""}
+    <div class="findings-head"><span class="label">${facetFilter === "all" ? "All findings" : esc(FACET_LABEL[facetFilter])} · ${shown.length}</span><span class="label">Scanned ${new Date(r.scannedAt).toLocaleTimeString()}</span></div>
+    <div class="findings">${findings}</div>`;
+}
+
+async function load() {
+  clients = await fetch("/api/clients").then((r) => r.json());
+  if (!selected && clients.length) selected = clients[0].id;
+  renderClients(); renderReport();
+}
+
+async function act(kind) {
+  busy = kind; renderReport();
+  const res = await fetch(`/api/clients/${encodeURIComponent(selected)}/${kind}`, { method: "POST" });
+  const body = await res.json();
+  busy = null;
+  if (!res.ok) { renderReport(); $("report").insertAdjacentHTML("beforeend", `<div class="note bad" role="alert">${esc(body.error || "Something went wrong.")}</div>`); return; }
+  clients = clients.map((c) => c.id === body.id ? body : c);
+  renderClients(); renderReport();
+}
+
+$("clients").onclick = (e) => {
+  const b = e.target.closest(".client"); if (!b) return;
+  selected = b.dataset.id; facetFilter = "all"; renderClients(); renderReport();
+};
+$("report").onclick = (e) => {
+  const a = e.target.closest("[data-act]"); if (a) return act(a.dataset.act);
+  const f = e.target.closest("[data-facet]"); if (f) { facetFilter = f.dataset.facet; renderReport(); }
+};
+$("add").onsubmit = async (e) => {
+  e.preventDefault();
+  $("add-err").textContent = "";
+  const res = await fetch("/api/clients", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: $("add-name").value, path: $("add-path").value }) });
+  const body = await res.json();
+  if (!res.ok) { $("add-err").textContent = body.error; return; }
+  clients.push(body); selected = body.id; facetFilter = "all";
+  $("add").reset(); renderClients(); renderReport();
+};
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+{
+  "name": "last-look",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts",
+    "firewall": "tsx src/server.ts",
+    "setup": "tsx scripts/setup.ts",
+    "demo:transfer": "tsx scripts/demo-transfer.ts",
+    "typecheck": "tsc",
+    "seller": "tsx src/seller.ts",
+    "dev": "tsx src/dev.ts",
+    "agent": "tsx src/agent.ts",
+    "test:filter": "tsx scripts/test-filter.ts",
+    "watchdog:selftest": "tsx scripts/watchdog-selftest.ts",
+    "demo:leak": "tsx scripts/leak-spend.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
+    "@solana-program/system": "^0.16.0",
+    "@solana-program/token": "^0.16.1",
+    "@solana-program/token-2022": "^0.16.1",
+    "@solana/kit": "^8.6.0",
+    "@x402/core": "^2.31.0",
+    "@x402/express": "^2.31.0",
+    "@x402/fetch": "^2.31.0",
+    "@x402/svm": "^2.31.0",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

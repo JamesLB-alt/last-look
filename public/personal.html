@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Last Look · For individuals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237d5cff'/%3E%3Cpath d='M5.5 16C9 10.6 12.4 8.6 16 8.6S23 10.6 26.5 16C23 21.4 19.6 23.4 16 23.4S9 21.4 5.5 16Z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='4.4' fill='white'/%3E%3Ccircle cx='17.5' cy='14.6' r='1.5' fill='%236a46ee'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/theme.css" />
+<style>
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 8px 0 90px; align-items: start; }
+  @media (max-width: 960px) { .tools { grid-template-columns: minmax(0, 1fr); } }
+  .tool h2 { margin: 6px 0 4px; font-weight: 500; font-size: 28px; letter-spacing: -.035em; }
+  .tool .sub { color: var(--muted); margin: 0 0 16px; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; min-width: 0; }
+  textarea { font: 400 12.5px/1.5 var(--mono); background: var(--panel-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: 14px; padding: 12px 14px; width: 100%; min-height: 96px; resize: vertical; }
+  textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+  .examples button { height: 34px; padding: 0 14px; font-size: 13px; }
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .hint a { color: var(--accent); }
+  .err { color: var(--block); font-size: 13.5px; margin-top: 10px; }
+  .result { margin-top: 18px; }
+
+  /* checkup */
+  .summary-row { display: flex; align-items: center; gap: 16px; padding: 14px 16px; background: var(--panel-2); border-radius: 18px; }
+  .summary-row .big { font-size: 22px; font-weight: 500; letter-spacing: -.03em; }
+  .summary-row .s { color: var(--muted); font-size: 13.5px; }
+  .tokens { margin-top: 12px; }
+  .tok { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .tok:last-child { border-bottom: 0; }
+  .tok .ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; flex: none; background: var(--panel-3); }
+  .tok .ic.usdc { background: #2775ca; color: #fff; } .tok .ic.sol { background: linear-gradient(135deg, #9945ff, #14f195); color: #fff; }
+  .tok .grow { flex: 1; min-width: 0; } .tok .t2 { font-size: 12.5px; color: var(--muted); }
+  .tok .r { font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* flags (shared by both tools) */
+  .flags { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .flag { border-radius: 16px; padding: 12px 14px; background: var(--panel-2); border: 1px solid var(--line); }
+  .flag.critical { background: var(--block-tint); border-color: color-mix(in srgb, var(--block) 25%, transparent); }
+  .flag.high { background: var(--ask-tint); border-color: color-mix(in srgb, var(--ask) 25%, transparent); }
+  .flag .t { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-weight: 600; }
+  .flag p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+  .flag .fix { color: var(--ink); }
+  .flag code { font: 400 12px var(--mono); overflow-wrap: anywhere; }
+  .sev { font: 600 10.5px var(--sans); letter-spacing: .1em; text-transform: uppercase; padding: 3px 9px; border-radius: 99px; background: var(--panel-3); color: var(--muted); }
+  .sev.critical { color: var(--block); background: color-mix(in srgb, var(--block) 15%, transparent); }
+  .sev.high { color: var(--ask); background: color-mix(in srgb, var(--ask) 15%, transparent); }
+  .sev.medium { color: var(--med); background: color-mix(in srgb, var(--med) 15%, transparent); }
+  .clean { padding: 14px 16px; border-radius: 16px; background: var(--allow-tint); color: var(--allow); font-weight: 500; margin-top: 12px; }
+
+  /* inspect verdict */
+  .verdict { border-radius: 20px; padding: 18px 20px; display: flex; gap: 14px; align-items: center; }
+  .verdict.danger { background: var(--block-tint); border: 1px solid color-mix(in srgb, var(--block) 35%, transparent); }
+  .verdict.caution { background: var(--ask-tint); border: 1px solid color-mix(in srgb, var(--ask) 35%, transparent); }
+  .verdict.normal { background: var(--allow-tint); border: 1px solid color-mix(in srgb, var(--allow) 30%, transparent); }
+  .verdict .v { font-size: 26px; font-weight: 500; letter-spacing: -.035em; line-height: 1.1; }
+  .verdict.danger .v { color: var(--block); } .verdict.caution .v { color: var(--ask); } .verdict.normal .v { color: var(--allow); }
+  .verdict .s { color: var(--muted); font-size: 13.5px; }
+  .steps { list-style: none; margin: 14px 0 0; padding: 0; counter-reset: s; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 28px 1fr; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .steps li:last-child { border-bottom: 0; }
+  .steps li::before { content: counter(s); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--sans); background: var(--accent-tint); color: var(--accent); }
+  .simline { margin-top: 10px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="announce"><div class="wrap"><span class="dot on"></span><span><b>Free and read-only.</b><span class="long"> No account, no wallet connection. Nothing is signed or stored. Solana devnet.</span></span></div></div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="wordmark" href="/"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9b7dff"/><stop offset="1" stop-color="#5b36e0"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#mk)"/><path d="M5.5 16C9 10.6 12.4 8.6 16 8.6S23 10.6 26.5 16C23 21.4 19.6 23.4 16 23.4S9 21.4 5.5 16Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><circle cx="16" cy="16" r="4.4" fill="#fff"/><circle cx="17.5" cy="14.6" r="1.5" fill="#6a46ee"/></svg>Last Look</a>
+    <nav class="pills" aria-label="Sections">
+      <a href="/personal.html" aria-current="page"><span class="long">For individuals</span><span class="short">Individuals</span></a>
+      <a href="/firewall.html"><span class="long">For business</span><span class="short">Business</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" style="grid-template-columns: 1fr; padding-bottom: 24px">
+    <div>
+      <div class="label">For individuals</div>
+      <h1 style="max-width: 18ch">Is your wallet <em class="accent">safe?</em> Find out in ten seconds.</h1>
+      <p class="lede" style="max-width: 62ch">Drainers rarely steal keys. They get you to sign something: an unlimited approval, a fake "security upgrade", a payment to a look-alike address. Check your wallet for open approvals, and check any transaction before you sign it.</p>
+    </div>
+  </section>
+
+  <div class="tools">
+    <!-- Wallet checkup -->
+    <section class="card tool" aria-label="Wallet checkup">
+      <div class="label">Tool 1</div>
+      <h2>Wallet <em class="accent">checkup</em></h2>
+      <p class="sub">Every token you hold, and anyone who's allowed to spend it.</p>
+      <form id="checkup-form" class="row">
+        <input id="addr" class="mono" placeholder="Solana address" autocomplete="off" spellcheck="false" aria-label="Solana address" />
+        <button class="primary" type="submit" id="checkup-btn">Check</button>
+      </form>
+      <div class="hint">No address handy? <a href="#" id="demo-addr">Try Circle's devnet USDC wallet</a></div>
+      <div id="checkup" class="result" aria-live="polite"></div>
+    </section>
+
+    <!-- Check before you sign -->
+    <section class="card tool" aria-label="Check before you sign">
+      <div class="label">Tool 2</div>
+      <h2>Check before you <em class="accent">sign</em></h2>
+      <p class="sub">Paste a transaction (base64) to see what it really does.</p>
+      <div class="label" style="margin-top:4px">Or try one</div>
+      <div class="examples" id="examples"><span class="hint">Loading examples…</span></div>
+      <form id="inspect-form">
+        <textarea id="tx" placeholder="Base64-encoded transaction" spellcheck="false" aria-label="Transaction"></textarea>
+        <button class="primary" type="submit" id="inspect-btn" style="margin-top:10px">Inspect</button>
+      </form>
+      <div id="inspect" class="result" aria-live="polite"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const short = (a) => a ? a.slice(0, 4) + "…" + a.slice(-4) : "?";
+const explorer = (a) => `https://explorer.solana.com/address/${a}?cluster=devnet`;
+const tone = (s) => s >= 85 ? "allow" : s >= 50 ? "ask" : "block";
+const flagHtml = (f) => `
+  <div class="flag ${f.severity}"><div class="t"><span class="sev ${f.severity}">${esc(f.severity)}</span>${esc(f.title)}</div>
+    <p>${esc(f.detail)}</p>${f.fix ? `<p class="fix">Fix: ${esc(f.fix).replace(/(spl-token revoke \S+)/, "<code>$1</code>")}</p>` : ""}</div>`;
+
+function ring(score) {
+  const c = 2 * Math.PI * 26;
+  return `<div class="ring" style="width:64px;height:64px"><svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="var(--line-2)" stroke-width="7"/>
+    <circle cx="32" cy="32" r="26" fill="none" stroke="var(--${tone(score)})" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - score / 100)}"/></svg><div class="val"><b style="font-size:20px">${score}</b></div></div>`;
+}
+
+/* ---------- wallet checkup ---------- */
+async function runCheckup(address) {
+  $("checkup-btn").disabled = true; $("checkup-btn").textContent = "Checking…";
+  $("checkup").innerHTML = "";
+  try {
+    const res = await fetch(`/api/personal/checkup/${encodeURIComponent(address.trim())}`);
+    const r = await res.json();
+    if (!res.ok) throw new Error(r.error);
+    const worst = r.flags.find((f) => f.severity === "critical" || f.severity === "high");
+    $("checkup").innerHTML = `
+      <div class="summary-row">${ring(r.score)}
+        <div><div class="big">${worst ? "Action needed" : r.flags.some((f) => f.severity === "medium") ? "Mostly safe" : "Looks safe"}</div>
+          <div class="s"><a href="${explorer(r.address)}" target="_blank" rel="noopener" class="mono">${short(r.address)}</a> · ${r.activity.recent} recent transactions${r.activity.last ? `, last ${new Date(r.activity.last).toLocaleDateString()}` : ""}</div></div></div>
+      <div class="tokens">
+        <div class="tok"><span class="ic sol">◎</span><span class="grow"><b>SOL</b><div class="t2">for network fees</div></span><span class="r">${r.sol.toFixed(4)}</span></div>
+        ${r.tokens.map((t) => `<div class="tok"><span class="ic ${t.symbol === "USDC" ? "usdc" : ""}">${t.symbol === "USDC" ? "$" : "•"}</span><span class="grow"><b>${esc(t.symbol)}</b><div class="t2">${t.delegate ? `<span class="bad">approval open → ${short(t.delegate)}</span>` : "no approvals"}${t.frozen ? " · frozen" : ""}</div></span><span class="r">${t.amount.toLocaleString()}</span></div>`).join("")}
+      </div>
+      ${r.flags.length ? `<div class="flags">${r.flags.map(flagHtml).join("")}</div>` : `<div class="clean">No open approvals. Nobody else can spend from this wallet.</div>`}`;
+  } catch (e) {
+    $("checkup").innerHTML = `<div class="err" role="alert">${esc(e.message)}</div>`;
+  } finally {
+    $("checkup-btn").disabled = false; $("checkup-btn").textContent = "Check";
+  }
+}
+$("checkup-form").onsubmit = (e) => { e.preventDefault(); if ($("addr").value.trim()) runCheckup($("addr").value); };
+$("demo-addr").onclick = (e) => { e.preventDefault(); $("addr").value = "GrNg1XM2ctzeE2mXxXCfhcTUbejM8Z4z4wNVTy2FjMEz"; runCheckup($("addr").value); };
+
+/* ---------- check before you sign ---------- */
+const VERDICT = {
+  danger: ["Don't sign this", "It gives someone else control over your funds."],
+  caution: ["Be careful", "Nothing here is outright theft, but read the flags first."],
+  normal: ["Looks normal", "It does what a normal payment does, and nothing else."],
+};
+// Translate the network's error code into words; fall back to the raw code.
+const simReason = (err) =>
+  /InvalidAccountForFee|AccountNotFound/.test(err || "") ? "the signer has no SOL for fees"
+  : /InsufficientFunds|insufficient/i.test(err || "") ? "not enough tokens in the account"
+  : err || "unknown reason";
+async function runInspect(tx) {
+  $("inspect-btn").disabled = true; $("inspect-btn").textContent = "Inspecting…";
+  $("inspect").innerHTML = "";
+  try {
+    const res = await fetch("/api/personal/inspect", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ transaction: tx }) });
+    const r = await res.json();
+    if (!res.ok) throw new Error(r.error);
+    const [title, sub] = VERDICT[r.verdict];
+    const real = r.flags.filter((f) => f.severity !== "info");
+    const info = r.flags.filter((f) => f.severity === "info");
+    $("inspect").innerHTML = `
+      <div class="verdict ${r.verdict}"><div><div class="v">${title}</div><div class="s">${sub}</div></div></div>
+      <div class="label" style="margin-top:16px">What this transaction does</div>
+      <ol class="steps">${r.steps.map((s) => `<li><span>${esc(s)}</span></li>`).join("")}</ol>
+      ${real.length ? `<div class="flags">${real.map(flagHtml).join("")}</div>` : ""}
+      <div class="simline">Signer: <span class="mono">${short(r.signer)}</span> · Simulation: ${r.simulation.ok ? "would succeed" : `would fail right now (${esc(simReason(r.simulation.error))})`}</div>`;
+  } catch (e) {
+    $("inspect").innerHTML = `<div class="err" role="alert">${esc(e.message)}</div>`;
+  } finally {
+    $("inspect-btn").disabled = false; $("inspect-btn").textContent = "Inspect";
+  }
+}
+$("inspect-form").onsubmit = (e) => { e.preventDefault(); if ($("tx").value.trim()) runInspect($("tx").value); };
+
+fetch("/api/personal/examples").then((r) => r.json()).then((list) => {
+  if (!Array.isArray(list)) throw new Error();
+  $("examples").innerHTML = list.map((x) => `<button type="button" data-id="${esc(x.id)}" title="${esc(x.blurb)}">${esc(x.label)}</button>`).join("");
+  $("examples").onclick = (e) => {
+    const b = e.target.closest("button[data-id]"); if (!b) return;
+    const ex = list.find((x) => x.id === b.dataset.id);
+    $("tx").value = ex.transaction; runInspect(ex.transaction);
+  };
+}).catch(() => { $("examples").innerHTML = `<span class="hint">Examples need the devnet RPC; paste a transaction instead.</span>`; });
+</script>
+</body>
+</html>

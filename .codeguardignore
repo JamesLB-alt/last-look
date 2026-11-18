@@ -1,0 +1,3 @@
+# Paths Code Guard skips when scanning this repo.
+# examples/ holds an intentionally vulnerable demo client (fake keys only).
+examples/

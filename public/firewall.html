@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Last Look</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237d5cff'/%3E%3Cpath d='M5.5 16C9 10.6 12.4 8.6 16 8.6S23 10.6 26.5 16C23 21.4 19.6 23.4 16 23.4S9 21.4 5.5 16Z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='4.4' fill='white'/%3E%3Ccircle cx='17.5' cy='14.6' r='1.5' fill='%236a46ee'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/theme.css" />
+<style>
+  /* ---------- pinned approvals ---------- */
+  #pending { display: flex; flex-direction: column; gap: 10px; }
+  #pending:not(:empty) { margin-bottom: 8px; }
+  .approval { border: 1px solid color-mix(in srgb, var(--ask) 40%, transparent); background: var(--ask-tint); border-radius: 20px; padding: 16px 20px; display: grid; grid-template-columns: 1fr auto; gap: 6px 18px; align-items: center; }
+  .approval .what { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .approval .amt { font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
+  .approval .why { color: var(--muted); grid-column: 1; }
+  .approval .btns { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 8px; }
+  @media (max-width: 640px) { .approval { grid-template-columns: 1fr; } .approval .btns { grid-row: auto; grid-column: 1; } }
+
+  /* ---------- command center grid ---------- */
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 1080px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } #agent-card { grid-column: 1 / -1; } }
+  @media (max-width: 720px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+  /* wallet */
+  .acct { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .acct .nm { font-weight: 600; line-height: 1.2; }
+  .acct .ad { font: 400 12.5px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  .icon-btn { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; color: var(--muted); }
+  .icon-btn:hover { background: var(--panel-2); color: var(--ink); filter: none; }
+  .balance { text-align: center; padding: 14px 0 2px; }
+  .balance .big { font-size: 46px; font-weight: 600; letter-spacing: -.045em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .balance .sub { color: var(--muted); font-size: 13.5px; margin-top: 6px; }
+  .actions-row { display: flex; justify-content: center; gap: 26px; margin: 18px 0 20px; }
+  .round { display: flex; flex-direction: column; align-items: center; gap: 7px; font: 500 12.5px var(--sans); color: var(--muted); background: none; border: 0; height: auto; padding: 0; text-decoration: none; }
+  .round .c { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink); }
+  .round.freeze .c { color: var(--block); border-color: color-mix(in srgb, var(--block) 40%, transparent); }
+  .round.freeze.on .c { background: var(--block); color: #fff; }
+  .budget { background: var(--panel-2); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .budget .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .budget .row b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .meter { height: 6px; background: var(--line); border-radius: 99px; margin: 10px 0; overflow: hidden; }
+  .meter > div { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); transition: width .5s ease; }
+  .limits { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+  .limits b { color: var(--ink); font-weight: 600; }
+  .wallet-tabs { margin: 18px 0 6px; }
+  .list .item { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+  .list .item:last-child { border-bottom: 0; }
+  .token { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 600 14px var(--sans); flex: none; }
+  .token.usdc { background: #2775ca; color: #fff; }
+  .token.sol { background: linear-gradient(135deg, #9945ff, #14f195); color: #fff; }
+  .token.ven { background: var(--allow-tint); color: var(--allow); }
+  .item .grow { flex: 1; min-width: 0; }
+  .item .t1 { font-weight: 500; }
+  .item .t2 { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .r { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* health */
+  .health-top { display: flex; align-items: center; gap: 18px; }
+  .health-label { font-size: 22px; font-weight: 500; letter-spacing: -.03em; }
+  .health-sub { color: var(--muted); font-size: 13.5px; }
+  .checks { margin-top: 14px; }
+  .check { display: grid; grid-template-columns: 22px 1fr; gap: 1px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .check:last-child { border-bottom: 0; }
+  .check .ic { grid-row: span 2; padding-top: 2px; }
+  .check .l { font-weight: 500; }
+  .check .d { color: var(--muted); font-size: 13px; }
+  .threats { margin-top: auto; padding: 14px 16px; border-radius: 16px; background: var(--panel-2); display: flex; justify-content: space-between; align-items: center; }
+  .threats b { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* agent */
+  .agent-status.running .dot { background: var(--allow); animation: pulse 1.2s ease infinite; }
+  .task { background: var(--panel-2); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  .task p { margin: 6px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ctx { display: flex; align-items: flex-start; gap: 10px; margin: 10px 0 4px; padding: 12px 14px; border-radius: 16px; font-size: 13.5px; }
+  .ctx.clean { background: var(--allow-tint); }
+  .ctx.tainted { background: var(--block-tint); }
+  .ctx b { font: 600 11px var(--sans); letter-spacing: .12em; }
+  .timeline { list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; max-height: 340px; flex: 1; }
+  .timeline li { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .timeline li:last-child { border-bottom: 0; }
+  .timeline .ic { padding-top: 2px; color: var(--muted); }
+  .timeline .tx { min-width: 0; overflow-wrap: anywhere; }
+  .timeline .tx .mono { font-size: 12px; color: var(--muted); }
+  .timeline .tm { font: 400 11.5px var(--mono); color: var(--dim); padding-top: 2px; }
+  .timeline li.decision.block .ic, .timeline li.taint .ic, .timeline li.error .ic { color: var(--block); }
+  .timeline li.decision.allow .ic { color: var(--allow); }
+  .timeline li.decision.pending .ic { color: var(--ask); }
+  .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* activity */
+  #feed { display: flex; flex-direction: column; gap: 10px; margin-bottom: 90px; }
+  .ev { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 18px 20px; position: relative; overflow: hidden; }
+  .ev::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; border-radius: 0 3px 3px 0; background: var(--dim); }
+  .ev.allow::before { background: var(--allow); }
+  .ev.block::before { background: var(--block); }
+  .ev.pending::before { background: var(--ask); }
+  .ev.block.hot { background: linear-gradient(90deg, var(--block-tint), var(--panel) 70%); border-color: color-mix(in srgb, var(--block) 22%, transparent); }
+  .ev.pending { background: linear-gradient(90deg, var(--ask-tint), var(--panel) 70%); }
+  .ev.fresh { animation: in .4s ease; }
+  .ev-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .amt { font-size: 22px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+  .to { color: var(--muted); }
+  .to .name { color: var(--ink); font-weight: 500; }
+  .to .unknown { color: var(--block); font-weight: 500; }
+  .to a { color: var(--block); text-decoration-style: dotted; text-underline-offset: 3px; }
+  .time { margin-left: auto; font: 400 12px var(--mono); color: var(--dim); }
+  .purpose { margin: 8px 0 0; color: var(--muted); }
+  .purpose q { color: var(--ink); }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .meta .chip { letter-spacing: .06em; }
+  .meta .chip b { color: var(--ink); font-weight: 600; }
+  ul.reasons { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); }
+  ul.reasons li { padding-left: 18px; position: relative; margin: 3px 0; }
+  ul.reasons li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+  #frozen-bar { background: var(--block); }
+  #alert-bar { background: #7a1712; }
+  #alert-bar.show { animation: flash .9s ease 3; }
+</style>
+</head>
+<body>
+<div class="announce"><div class="wrap"><span class="dot on"></span><span><b>Live on Solana devnet.</b><span class="long"> Every payment your AI agent attempts is decoded, simulated and checked before it's signed.</span></span><a href="/clients.html">Scan client code →</a></div></div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="wordmark" href="/"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9b7dff"/><stop offset="1" stop-color="#5b36e0"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#mk)"/><path d="M5.5 16C9 10.6 12.4 8.6 16 8.6S23 10.6 26.5 16C23 21.4 19.6 23.4 16 23.4S9 21.4 5.5 16Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><circle cx="16" cy="16" r="4.4" fill="#fff"/><circle cx="17.5" cy="14.6" r="1.5" fill="#6a46ee"/></svg>Last Look</a>
+    <nav class="pills" aria-label="Sections">
+      <a href="/personal.html"><span class="long">For individuals</span><span class="short">Individuals</span></a>
+      <a href="/firewall.html" aria-current="page"><span class="long">For business</span><span class="short">Business</span></a>
+    </nav>
+    <span class="pill hide-sm"><span class="dot" id="live"></span>Devnet</span>
+    <button class="danger sm" id="freeze-top" title="Stop the agent from spending anything"><span>Freeze<span class="long"> spending</span></span></button>
+  </div>
+</header>
+<div class="wrap subnav"><nav class="tabs" aria-label="Business tools"><a href="/firewall.html" aria-current="page" class="sel">Agent firewall</a><a href="/clients.html">Code Guard</a></nav></div>
+
+<div class="banner" id="frozen-bar"><div class="wrap"><span class="label">Kill switch on</span>Spending is frozen. The agent can't sign anything until you unfreeze.</div></div>
+<div class="banner" id="alert-bar" role="alert"><div class="wrap"><span class="label">Out-of-band spend</span><span id="alert-msg"></span></div></div>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <div class="label">Wallet firewall for AI agents</div>
+      <h1>Agent payments, <em class="accent">guarded</em> before they're signed.</h1>
+      <p class="lede">Your agent can ask to spend. Only Last Look can sign, and only after the payment passes your limits, your allowlist and a dry run. Prompt injections hit a wall, not your wallet.</p>
+      <div class="cta">
+        <a class="btn primary" href="#activity">See live activity <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14m0 0-6-6m6 6 6-6"/></svg></a>
+        <a class="btn" href="/clients.html">Scan client code</a>
+      </div>
+    </div>
+    <div class="orbit" aria-label="Live status">
+      <div class="circle"><canvas id="eye" aria-hidden="true"></canvas></div>
+      <div class="float f1"><div class="label">Spent today</div><div class="v" id="h-spent">$0.00</div><div class="s" id="h-spent-s">of your daily budget</div></div>
+      <div class="float f2"><div class="label">Security health</div><div class="v" id="h-health">—</div><div class="s" id="h-health-s">checking…</div></div>
+      <div class="float f3"><div class="label">Suspicious blocked</div><div class="v bad" id="h-blocked">0</div><div class="s">in the last hour</div></div>
+      <div class="float f4"><div class="label">AI agent</div><div class="v" id="h-agent">Idle</div><div class="s" id="h-agent-s">no task running</div></div>
+    </div>
+  </section>
+
+  <div id="pending" aria-live="polite"></div>
+
+  <div class="section-head"><h2>Command <em class="accent">center</em></h2><span class="label" id="health-time"></span></div>
+  <div class="grid">
+    <!-- Wallet -->
+    <section class="card" aria-label="Agent wallet">
+      <div class="card-head">
+        <div class="acct">
+          <canvas class="avatar" id="avatar" width="38" height="38" aria-hidden="true"></canvas>
+          <div>
+            <div class="nm">Agent wallet</div>
+            <div class="ad"><span id="addr">…</span>
+              <button class="icon-btn" id="copy" title="Copy address" aria-label="Copy address"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <span class="chip good" id="wallet-status">Guarded</span>
+      </div>
+      <div class="balance"><div class="big" id="bal">$—</div><div class="sub" id="bal-sub">USDC · loading…</div></div>
+      <div class="actions-row">
+        <button class="round" id="copy2"><span class="c"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg></span>Receive</button>
+        <a class="round" id="explorer" target="_blank" rel="noopener"><span class="c"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></span>Explorer</a>
+        <button class="round freeze" id="freeze-round"><span class="c"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span id="freeze-label">Freeze</span></button>
+      </div>
+      <div class="budget">
+        <div class="row"><span class="label">Today's budget</span><span><b id="spent">$0.00</b> <span style="color:var(--muted)">/ <span id="limit">$0.00</span></span></span></div>
+        <div class="meter"><div id="meter"></div></div>
+        <div class="limits" id="limits"></div>
+      </div>
+      <div class="tabs wallet-tabs" role="tablist">
+        <button class="sel" data-wtab="assets" role="tab">Assets</button>
+        <button data-wtab="trusted" role="tab">Trusted<span class="n" id="n-trusted"></span></button>
+      </div>
+      <div class="list" id="wallet-list"></div>
+    </section>
+
+    <!-- Security health -->
+    <section class="card" aria-label="Security health">
+      <div class="card-head"><span class="label">Security health</span></div>
+      <div class="health-top">
+        <div class="ring" style="width:104px;height:104px">
+          <svg width="104" height="104" viewBox="0 0 104 104"><circle cx="52" cy="52" r="44" fill="none" stroke="var(--line-2)" stroke-width="8"/><circle id="ring-arc" cx="52" cy="52" r="44" fill="none" stroke="var(--allow)" stroke-width="8" stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="276.5" style="transition: stroke-dashoffset .8s ease, stroke .3s"/></svg>
+          <div class="val"><div><b id="score" style="font-size:32px">—</b><small>/ 100</small></div></div>
+        </div>
+        <div><div class="health-label" id="health-label">Checking…</div><div class="health-sub" id="health-sub"></div></div>
+      </div>
+      <div class="checks" id="checks"></div>
+      <div class="threats"><span class="label">Suspicious payments blocked · 1h</span><b id="threats">0</b></div>
+    </section>
+
+    <!-- AI agent -->
+    <section class="card" id="agent-card" aria-label="AI agent">
+      <div class="card-head"><span class="label">AI agent</span><span class="chip agent-status" id="agent-status"><span class="dot"></span><span id="agent-status-t">Idle</span></span></div>
+      <div id="agent-body"></div>
+    </section>
+  </div>
+
+  <div class="section-head" id="activity"><h2>Every payment, <em class="accent">explained</em></h2>
+    <div class="tabs" role="tablist" id="feed-tabs">
+      <button class="sel" data-f="all">All<span class="n" id="c-all"></span></button>
+      <button data-f="block">Blocked<span class="n" id="c-block"></span></button>
+      <button data-f="pending">Waiting<span class="n" id="c-pending"></span></button>
+      <button data-f="allow">Allowed<span class="n" id="c-allow"></span></button>
+    </div>
+  </div>
+  <div id="feed"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (units) => "$" + (Number(units) / 1e6).toFixed(2);
+const usd = (n) => "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const short = (a) => a ? a.slice(0, 4) + "…" + a.slice(-4) : "?";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const explorer = (a) => `https://explorer.solana.com/address/${a}?cluster=devnet`;
+const hhmmss = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+const ICON = {
+  ok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 5 5 9-10"/></svg>',
+  warn: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4m0 3v.01"/></svg>',
+  fail: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  tool: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>',
+  text: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>',
+  shield: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6z"/></svg>',
+};
+
+const events = new Map();
+const seen = new Set();
+let state = null, walletData = null, feedFilter = "all", walletTab = "assets";
+
+const VERDICT = { allow: ["good", "Allowed"], block: ["bad", "Blocked"], pending: ["mid", "Waiting for you"] };
+const verdictChip = (d) => `<span class="chip ${VERDICT[d]?.[0] || ""}">${VERDICT[d]?.[1] || d}</span>`;
+const KIND = { "token-approve": "grants spending rights", "token-set-authority": "hands over ownership", "token-close": "closes account", "unknown": "unknown program", "sol-transfer": "sends SOL" };
+const recipient = (ev) => (ev.recipients || []).map((r) => r.name
+  ? `<span class="name">${esc(r.name)}</span>`
+  : `<span class="unknown">unknown wallet</span> <a class="mono" href="${explorer(r.owner || r.ata)}" target="_blank" rel="noopener">${short(r.owner || r.ata)}</a>`).join(", ");
+const recipientPlain = (ev) => ev.recipients?.[0]?.name || (ev.recipients?.length ? "unknown wallet " + short(ev.recipients[0].owner || ev.recipients[0].ata) : "no transfer");
+
+/* identicon: deterministic 5x5 mirrored blocks */
+function avatar(canvas, addr) {
+  let h = 2166136261;
+  for (const ch of addr) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const ctx = canvas.getContext("2d"), s = canvas.width / 5;
+  ctx.fillStyle = `hsl(${(h >>> 0) % 360} 35% 18%)`; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = `hsl(${((h >>> 0) % 360 + 40) % 360} 75% 66%)`;
+  for (let y = 0; y < 5; y++) for (let x = 0; x < 3; x++)
+    if ((h >>> ((y * 3 + x) % 31)) & 1) { ctx.fillRect(x * s, y * s, s, s); ctx.fillRect((4 - x) * s, y * s, s, s); }
+}
+
+/* ---------- hero floating cards (live data) ---------- */
+function renderHero() {
+  if (state) {
+    $("h-spent").textContent = fmt(state.budget.spentToday);
+    $("h-spent-s").textContent = `of ${fmt(state.budget.dailyLimit)} daily budget`;
+    const s = state.session, st = s?.status || "idle";
+    $("h-agent").textContent = st === "running" ? "Running" : st === "done" ? "Finished" : "Idle";
+    $("h-agent").className = "v" + (st === "running" ? " good" : "");
+    $("h-agent-s").textContent = st === "idle" ? "no task running" : s.tainted ? "context tainted" : "context clean";
+  }
+  const h = walletData?.health;
+  if (h) {
+    $("h-health").textContent = h.score;
+    $("h-health").className = "v " + (h.score >= 85 ? "good" : h.score >= 60 ? "mid" : "bad");
+    const issues = h.checks.filter((c) => c.status !== "ok").length;
+    $("h-health-s").textContent = issues ? `${issues} issue${issues > 1 ? "s" : ""} to fix` : "all checks passing";
+    $("h-blocked").textContent = h.recentBlocks;
+    $("h-blocked").className = "v" + (h.recentBlocks ? " bad" : "");
+  }
+}
+
+/* ---------- activity ---------- */
+function card(ev) {
+  const d = ev.decision, s = ev.signals;
+  const meta = [
+    `<span class="chip">tool <b>${esc(ev.context.tool)}</b></span>`,
+    ev.context.tainted ? `<span class="chip bad">read untrusted content</span>` : "",
+    ...s.dangerousActions.map((a) => `<span class="chip bad">${esc(KIND[a.kind] || a.kind)}</span>`),
+    s.simulationFailed ? `<span class="chip">simulation failed</span>` : "",
+    ev.decidedBy && ev.decidedBy !== "policy" ? `<span class="chip">decided by <b>${esc(ev.decidedBy)}</b></span>` : "",
+  ].join("");
+  const hot = d === "block" && (ev.context.tainted || s.unknownRecipients.length) ? " hot" : "";
+  const fresh = seen.has(ev.id) ? "" : " fresh"; seen.add(ev.id);
+  return `<article class="ev ${d}${hot}${fresh}">
+    <div class="ev-top">${verdictChip(d)}<span class="amt">${fmt(s.outflow)}</span>
+      <span class="to">→ ${recipient(ev) || "no transfer"}</span><span class="time">${hhmmss(ev.at)}</span></div>
+    ${ev.context.purpose ? `<p class="purpose">Agent's reason: <q>${esc(ev.context.purpose)}</q></p>` : ""}
+    <div class="meta">${meta}</div>
+    ${ev.reasons?.length ? `<ul class="reasons">${ev.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
+  </article>`;
+}
+
+function renderActivity() {
+  const list = [...events.values()].sort((a, b) => b.at.localeCompare(a.at));
+  const count = (f) => list.filter((e) => f === "all" || e.decision === f).length;
+  for (const f of ["all", "block", "pending", "allow"]) $("c-" + f).textContent = count(f) || "";
+  const shown = list.filter((e) => feedFilter === "all" || e.decision === feedFilter);
+  $("feed").innerHTML = shown.length ? shown.map(card).join("")
+    : `<div class="empty">${list.length ? "Nothing in this view." : "No payment attempts yet. Every one the agent makes will show up here."}</div>`;
+  $("pending").innerHTML = list.filter((e) => e.decision === "pending").map((e) => `
+    <div class="approval" data-id="${esc(e.id)}">
+      <div class="what">${verdictChip("pending")}<span class="amt">${fmt(e.signals.outflow)}</span><span class="to">→ ${recipient(e)}</span></div>
+      <div class="why">${esc(e.reasons?.join(" · ") || "")}${e.context.purpose ? ` · agent says: “${esc(e.context.purpose)}”` : ""}</div>
+      <div class="btns"><button class="primary sm" data-act="approve">Approve</button><button class="sm" data-act="deny">Deny</button></div>
+    </div>`).join("");
+}
+
+/* ---------- wallet ---------- */
+function renderWallet() {
+  if (!state) return;
+  $("addr").textContent = short(state.agent);
+  $("explorer").href = explorer(state.agent);
+  const { spentToday, dailyLimit } = state.budget;
+  $("spent").textContent = fmt(spentToday); $("limit").textContent = fmt(dailyLimit);
+  $("meter").style.width = Math.min(100, Number(spentToday) / Number(dailyLimit) * 100) + "%";
+  $("limits").innerHTML = `<span>per payment ≤ <b>${fmt(state.policy.perTxLimit)}</b></span><span>ask me above <b>${fmt(state.policy.askAbove)}</b></span>`;
+  const frozen = state.frozen;
+  $("wallet-status").className = "chip " + (frozen ? "solid-bad" : "good");
+  $("wallet-status").textContent = frozen ? "Frozen" : "Guarded";
+  $("freeze-top").classList.toggle("on", frozen);
+  $("freeze-top").innerHTML = frozen ? "Unfreeze" : '<span>Freeze<span class="long"> spending</span></span>';
+  $("freeze-round").classList.toggle("on", frozen);
+  $("freeze-label").textContent = frozen ? "Unfreeze" : "Freeze";
+  $("frozen-bar").classList.toggle("show", frozen);
+  renderHero();
+
+  const w = walletData?.wallet;
+  if (!w) return;
+  $("bal").textContent = usd(w.usdc);
+  $("bal-sub").textContent = `USDC on ${w.network}` + (w.sol !== null ? ` · ${w.sol.toFixed(3)} SOL for fees` : "");
+  $("n-trusted").textContent = w.trusted.length;
+  $("wallet-list").innerHTML = walletTab === "assets" ? `
+    <div class="item"><div class="token usdc">$</div><div class="grow"><div class="t1">USD Coin</div><div class="t2">Spendable by the agent</div></div><div class="r"><div class="t1">${usd(w.usdc)}</div><div class="t2">${w.usdc.toFixed(2)} USDC</div></div></div>
+    <div class="item"><div class="token sol">◎</div><div class="grow"><div class="t1">Solana</div><div class="t2">Network fees only</div></div><div class="r"><div class="t1">${w.sol === null ? "—" : w.sol.toFixed(3)}</div><div class="t2">SOL</div></div></div>`
+  : w.trusted.map((t) => `
+    <div class="item"><div class="token ven">${ICON.ok}</div><div class="grow"><div class="t1">${esc(t.name)}</div><div class="t2"><a href="${explorer(t.owner)}" target="_blank" rel="noopener">${short(t.owner)}</a> · allowlisted</div></div><div class="r"><div class="t2">auto-pay ≤ ${fmt(state.policy.askAbove)}</div></div></div>`).join("")
+    || `<div class="empty">No trusted recipients. Every payment will need approval.</div>`;
+}
+
+/* ---------- health ---------- */
+function renderHealth() {
+  const h = walletData?.health;
+  if (!h) return;
+  const color = h.score >= 85 ? "var(--allow)" : h.score >= 60 ? "var(--ask)" : "var(--block)";
+  $("score").textContent = h.score;
+  $("ring-arc").style.stroke = color;
+  $("ring-arc").style.strokeDashoffset = 276.5 * (1 - h.score / 100);
+  const issues = h.checks.filter((c) => c.status !== "ok").length;
+  $("health-label").textContent = h.frozen ? "Frozen" : h.score >= 85 ? "Protected" : h.score >= 60 ? "Needs attention" : "At risk";
+  $("health-sub").textContent = issues ? `${issues} issue${issues > 1 ? "s" : ""} to fix` : "All checks passing";
+  $("checks").innerHTML = h.checks.map((c) => `
+    <div class="check"><span class="ic ${c.status === "ok" ? "ok" : c.status === "warn" ? "warn" : "bad"}">${ICON[c.status]}</span>
+      <span class="l">${esc(c.label)}</span><span class="d">${esc(c.detail)}</span></div>`).join("");
+  $("threats").textContent = h.recentBlocks;
+  $("threats").className = h.recentBlocks ? "bad" : "";
+  $("health-time").textContent = "Updated " + hhmmss(Date.now());
+  renderHero();
+}
+
+/* ---------- agent ---------- */
+function renderAgent() {
+  const s = state?.session;
+  const st = s?.status || "idle";
+  $("agent-status").className = "chip agent-status " + (st === "running" ? "good running" : "");
+  $("agent-status-t").textContent = st === "running" ? "Running" : st === "done" ? "Finished" : "Idle";
+  renderHero();
+  if (!s || st === "idle") {
+    $("agent-body").innerHTML = `<div class="empty">No agent running.<br><br>Start one with <code>npm run agent</code><br>or the attack demo: <code>npm run agent -- --naive</code></div>`;
+    return;
+  }
+  const decisions = [...events.values()].filter((e) => s.startedAt && e.at >= s.startedAt)
+    .map((e) => ({ at: e.at, kind: "decision", d: e.decision, text: `Firewall ${verdictChip(e.decision)} ${fmt(e.signals.outflow)} → ${esc(recipientPlain(e))}` }));
+  const steps = [...s.steps.map((x) => ({ ...x })), ...decisions].sort((a, b) => a.at.localeCompare(b.at));
+  const line = (x) => {
+    if (x.kind === "decision") return `<li class="decision ${x.d}"><span class="ic">${ICON.shield}</span><span class="tx">${x.text}</span><span class="tm">${hhmmss(x.at)}</span></li>`;
+    if (x.kind === "tool") return `<li class="tool"><span class="ic">${ICON.tool}</span><span class="tx"><b>${esc(x.tool)}</b> <span class="mono clamp">${esc(x.text)}</span></span><span class="tm">${hhmmss(x.at)}</span></li>`;
+    if (x.kind === "taint") return `<li class="taint"><span class="ic">${ICON.warn}</span><span class="tx">Context tainted: ${esc(x.text)}</span><span class="tm">${hhmmss(x.at)}</span></li>`;
+    if (x.kind === "error") return `<li class="error"><span class="ic">${ICON.fail}</span><span class="tx">${esc(x.text)}</span><span class="tm">${hhmmss(x.at)}</span></li>`;
+    return `<li class="text"><span class="ic">${ICON.text}</span><span class="tx clamp">${esc(x.text)}</span><span class="tm">${hhmmss(x.at)}</span></li>`;
+  };
+  const tl = document.querySelector(".timeline");
+  const nearBottom = !tl || tl.scrollHeight - tl.scrollTop - tl.clientHeight < 40;
+  $("agent-body").innerHTML = `
+    <div class="task"><div class="label">Task · <span class="mono" style="text-transform:none;letter-spacing:0">${esc(s.model || "")}</span>${s.naive ? " · naive mode" : ""}</div><p>${esc(s.question)}</p></div>
+    <div class="ctx ${s.tainted ? "tainted" : "clean"}"><span class="${s.tainted ? "bad" : "ok"}">${s.tainted ? ICON.warn : ICON.ok}</span>
+      <span><b class="${s.tainted ? "bad" : "ok"}">${s.tainted ? "CONTEXT TAINTED" : "CONTEXT CLEAN"}</b><br>${s.tainted ? "Agent has read untrusted content. Payments get extra scrutiny." : "Agent has only seen your instructions."}</span></div>
+    <ul class="timeline">${steps.map(line).join("") || `<li><span></span><span class="tx" style="color:var(--muted)">Thinking…</span><span></span></li>`}</ul>`;
+  const t = document.querySelector(".timeline");
+  if (t && nearBottom) t.scrollTop = t.scrollHeight;
+}
+
+/* ---------- data ---------- */
+async function loadState() {
+  state = await fetch("/api/state").then((r) => r.json());
+  for (const e of state.events) events.set(e.id, e);
+  avatar($("avatar"), state.agent);
+  renderWallet(); renderActivity(); renderAgent();
+}
+let walletTimer = null;
+async function loadWallet() {
+  clearTimeout(walletTimer);
+  try { walletData = await fetch("/api/wallet").then((r) => r.json()); renderWallet(); renderHealth(); } catch {}
+  walletTimer = setTimeout(loadWallet, 20000);
+}
+let walletSoon = null;
+const refreshWalletSoon = () => { clearTimeout(walletSoon); walletSoon = setTimeout(loadWallet, 600); };
+
+function connect() {
+  const es = new EventSource("/events");
+  es.onopen = () => $("live").classList.add("on");
+  es.onerror = () => $("live").classList.remove("on");
+  es.onmessage = (m) => {
+    const msg = JSON.parse(m.data);
+    if (msg.type === "agent") { state.session = msg.session; return renderAgent(); }
+    if (msg.type === "freeze") { state.frozen = msg.frozen; renderWallet(); return refreshWalletSoon(); }
+    if (msg.type === "alert") return showAlert(msg);
+    const changed = !events.has(msg.id) || events.get(msg.id).decision !== msg.decision;
+    events.set(msg.id, msg);
+    if (changed) eye.react(msg.decision);
+    loadState(); refreshWalletSoon();
+  };
+}
+function showAlert(a) {
+  $("alert-msg").textContent = a.message;
+  const el = $("alert-bar"); el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  eye.react("block"); refreshWalletSoon();
+}
+
+/* ---------- interactions ---------- */
+async function toggleFreeze() {
+  await fetch("/api/freeze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ frozen: !state.frozen }) });
+}
+$("freeze-top").onclick = toggleFreeze;
+$("freeze-round").onclick = toggleFreeze;
+const copyAddr = async (btn) => { try { await navigator.clipboard.writeText(state.agent); btn.title = "Copied"; } catch {} };
+$("copy").onclick = (e) => copyAddr(e.currentTarget);
+$("copy2").onclick = (e) => copyAddr(e.currentTarget);
+document.querySelectorAll("[data-wtab]").forEach((b) => b.onclick = () => {
+  walletTab = b.dataset.wtab;
+  document.querySelectorAll("[data-wtab]").forEach((x) => x.classList.toggle("sel", x === b));
+  renderWallet();
+});
+$("feed-tabs").onclick = (e) => {
+  const b = e.target.closest("[data-f]"); if (!b) return;
+  feedFilter = b.dataset.f;
+  document.querySelectorAll("[data-f]").forEach((x) => x.classList.toggle("sel", x === b));
+  renderActivity();
+};
+$("pending").onclick = async (e) => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  b.parentElement.querySelectorAll("button").forEach((x) => x.disabled = true);
+  await fetch(`/api/pending/${encodeURIComponent(b.closest(".approval").dataset.id)}/${b.dataset.act}`, { method: "POST" });
+};
+
+/* ---------- halftone eye inside the hero circle: reacts to every decision ---------- */
+const eye = (() => {
+  const cv = $("eye"), ctx = cv.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let pupil = 0.13, target = 0.13, tint = null, until = 0;
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  function size() { const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = r.width * d; cv.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
+  function I(x, y, t) {
+    const lh = 0.6 * (1 - x * x), d = lh > 0 ? Math.abs(y) / lh : 2;
+    if (d > 1) return 0;
+    let v = 0.16 + 0.6 * d ** 6;
+    const r = Math.hypot(x, y * 1.08);
+    if (r < 0.38) {
+      const ring = Math.max(0, 1 - Math.abs(r - 0.26) / 0.12);
+      v = Math.max(v, 0.35 + 0.65 * ring * (0.85 + 0.15 * Math.sin(Math.atan2(y, x) * 14 + t)));
+      if (r < pupil) v = 0;
+      if (Math.hypot(x + 0.09, y + 0.09) < 0.035) v = 1;
+    }
+    return Math.min(1, v + 0.04 * Math.sin(x * 7 + t) * Math.cos(y * 6 - t * .7));
+  }
+  function frame(now) {
+    const t = now / 1000, w = cv.clientWidth, h = cv.clientHeight;
+    pupil += (target - pupil) * 0.08;
+    if (now > until) { tint = null; target = 0.13; }
+    ctx.clearRect(0, 0, w, h);
+    const step = Math.max(6, Math.min(10, w / 44)), sx = w * 0.4;
+    ctx.fillStyle = tint || "#b69cff"; // the circle stays dark in both themes, so the dots stay light violet
+    for (let py = step / 2; py < h; py += step) for (let px = step / 2; px < w; px += step) {
+      const v = I((px - w / 2) / sx, (py - h / 2) / sx, t);
+      if (v < 0.06) continue;
+      ctx.globalAlpha = Math.min(1, 0.22 + v);
+      ctx.beginPath(); ctx.arc(px, py, (step / 2) * Math.sqrt(v) * 0.92, 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (!still) requestAnimationFrame(frame);
+  }
+  addEventListener("resize", () => { size(); if (still) frame(0); });
+  size(); requestAnimationFrame(frame);
+  return { react(d) {
+    const m = { block: ["--block", 0.05], allow: ["--allow", 0.17], pending: ["--ask", 0.1] }[d];
+    if (!m) return; tint = css(m[0]); target = m[1]; until = performance.now() + 1800; if (still) frame(performance.now());
+  } };
+})();
+
+loadState().then(() => { connect(); loadWallet(); });
+</script>
+</body>
+</html>
