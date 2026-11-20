@@ -24,9 +24,11 @@ AI agents are getting wallets, and agents read the open web. A single hidden ins
 - **Taint tracking:** once the agent reads untrusted content, paying anyone not on the allowlist is blocked outright. This is the prompt-injection rule.
 - Gemini prediction-market orders go through the same policy and budget, and the exchange keys also live only in the firewall.
 - A QuickNode Stream (Solana devnet, Block dataset, custom filter) reports every outflow from the agent wallet. Anything without a Last Look signature raises an out-of-band alert.
+- **On-chain audit trail:** every decision, allowed or blocked, becomes a hash-chained receipt written to Solana as a Memo transaction, with a fingerprint of the policy that made the call. Nobody can quietly edit why a payment was approved.
+- **Built-in red team:** one button fires 12 real drain techniques (injected transfers, unlimited approvals, ownership takeovers, unknown programs, a leaked key) at the real signing door. 12 of 12 are stopped, and the dashboard shows which layer stopped each one and how long the check took (about 155 ms median, under 1 ms of it our own code).
 
 ### What makes it unique?
-It works at the **signer**, not the prompt. Prompt filters and model guardrails can be talked around. A key the agent never holds can't be. It's agent-aware too: it knows *why* the agent is paying and whether it has read untrusted content, which a generic wallet policy engine doesn't. And it explains every decision in plain English on a live dashboard with a one-click kill switch.
+It works at the **signer**, not the prompt. Prompt filters and model guardrails can be talked around. A key the agent never holds can't be. It's agent-aware too: it knows *why* the agent is paying and whether it has read untrusted content, which a generic wallet policy engine doesn't. And it explains every decision in plain English on a live dashboard with a one-click kill switch. It is also checkable: you can attack it yourself with one button, and verify every past decision against Solana.
 
 ### What would you build next?
 Mobile push approvals, more chains, per-agent policies for teams with many agents, a community-reported scam-address list feeding the allowlist logic, and Code Guard as a CI check on every pull request.
@@ -41,6 +43,7 @@ Solana devnet, @solana/kit, SPL Token, x402 (@x402/svm, @x402/fetch, @x402/expre
 2. **0:10** "This research agent has USDC on Solana and pays for its own data." Run `npm run agent -- --naive`. The dashboard shows the x402 payment to DataCo **allowed**.
 3. **0:45** The agent reads the poisoned blog: **Context tainted**. It tries to send 40 USDC to the attacker. **Blocked**, the eye flashes red, and three reasons appear.
 4. **1:30** `--trade`: a ~$2 Gemini order comes up as **Waiting for you** → Approve.
-5. **1:55** `npm run demo:leak`: money moved with the raw key. The QuickNode Stream fires and the dashboard shows the **out-of-band** alert.
-6. **2:20** For individuals: paste the "free airdrop" transaction → **Don't sign this**.
-7. **2:35** "Wallets show you hex. Last Look shows you the truth."
+5. **1:50** `npm run demo:leak`: money moved with the raw key. The QuickNode Stream fires and the dashboard shows the **out-of-band** alert.
+6. **2:10** Click **Run attack suite**: 12 of 12 stopped. Scroll to the audit trail and open one receipt on the Solana explorer.
+7. **2:25** For individuals: paste the "free airdrop" transaction → **Don't sign this**.
+8. **2:40** "Wallets show you hex. Last Look shows you the truth."

@@ -74,6 +74,40 @@ Defaults in `src/server.ts`; rules in `src/firewall/policy.ts`; each rule has a 
 
 Spends count toward the budget when *approved*, not when they settle, because a signed transaction can land later.
 
+The three dollar limits can be retuned live from the dashboard (**Edit limits**). Every audit receipt records a fingerprint of the policy that was in force, so a later change can't rewrite why an earlier payment was allowed.
+
+## Red team: 12 attacks, one command
+
+`npm run redteam` (or **Run attack suite** on the dashboard) builds a real Solana transaction for each technique below and sends it through the same `POST /sign` door the agent uses. The decoder, the on-chain dry run and the policy all run for real. Nothing is mocked, and nothing is signed unless the firewall approves it.
+
+| # | Attack | Stopped by | Why |
+|---|---|---|---|
+| 1 | Prompt-injected $40 transfer to a new wallet | Policy | over the per-payment limit, over budget, tainted context + unknown recipient |
+| 2 | Injection that asks for only $0.50 ("stay under the limit") | Policy | tainted context + unknown recipient, at any amount |
+| 3 | $50 overspend at the real, allowlisted vendor | Policy | over the per-payment limit |
+| 4 | Unlimited token approval (delegate drain) | Decoder | `Approve` is never needed by a payment agent |
+| 5 | Ownership takeover (`SetAuthority`) | Decoder | hands the token account to someone else |
+| 6 | Close the account, sweep the rent | Decoder | `CloseAccount` |
+| 7 | Payment wrapped in an unknown program | Decoder | unrecognised program |
+| 8 | Direct SOL drain | Policy | the agent pays in USDC only |
+| 9 | Unchecked transfer that doesn't name its token | Policy | treated as USDC leaving the wallet; over the limit |
+| 10 | A transaction that doesn't ask for the agent's signature | Signer | refused before anything else runs |
+| 11 | A normal payment while the owner has hit Freeze | Kill switch | nothing is signed while frozen |
+| 12 | Leaked key that never asks the firewall at all | Watchdog | no Last Look signature on the spend (simulated stream event) |
+
+Result on devnet: **12 of 12 stopped**. A full check (decode, on-chain dry run, policy) took a median of about 155 ms against the public devnet RPC, and under 1 ms of that is Last Look's own code. The dashboard shows the measured time on every payment.
+
+## Audit trail on Solana
+
+Every decision, allowed or blocked, becomes a receipt in `src/firewall/receipt.ts`:
+
+- **Hash-chained.** Each receipt's SHA-256 covers the previous receipt, so editing, deleting or reordering history breaks the chain. `GET /api/receipts` recomputes it, and the dashboard's **Verify chain** button shows the result.
+- **Anchored on-chain.** The firewall writes each receipt to Solana as a Memo transaction from the agent wallet: `lastlook:v1 seq=3 id=ab12cd34 block usdc=40.00 policy=0ba9fd52726d2e2d h=<hash> prev=<hash>`. The dashboard links every receipt to the explorer.
+- **Bound to the policy and the payment.** The receipt includes a fingerprint of the limits in force and, for an allowed payment, the signature of the transaction Last Look signed.
+- **Invisible to the watchdog.** The firewall records its own receipt signatures, so the QuickNode Stream never mistakes a receipt for a leaked-key spend.
+
+Anchoring runs after the decision and never delays it. If the wallet has no SOL, the receipt stays in the local chain and **Retry anchoring** sends it later. Set `LASTLOOK_ANCHOR=off` to keep receipts local.
+
 ---
 
 ## How it uses Solana (Best use of Solana)
@@ -139,7 +173,8 @@ Fund the **agent** with devnet SOL ([faucet.solana.com](https://faucet.solana.co
 | `npm run agent -- --trade` | Also lets it place a ~$2 sandbox order (lands in *ask*) |
 | `npm run demo:transfer [-- --dry]` | Three scripted payments: allow, block (injection), ask |
 | `npm run demo:leak` | Spends with the raw key, bypassing the firewall (the watchdog demo) |
-| `npm test` | Policy + watchdog unit tests |
+| `npm run redteam` | Fires the 12-attack suite at the running firewall and prints the scoreboard |
+| `npm test` | Policy, watchdog and audit-receipt unit tests |
 | `npm run test:filter` | QuickNode filter against real devnet transactions |
 | `npm run watchdog:selftest` | Simulated Stream event → dashboard alert |
 
@@ -156,7 +191,8 @@ Pages: `/` (landing), `/personal.html` (individuals), `/firewall.html` (agent fi
 
 | Verified | Not yet verified |
 |---|---|
-| Policy (13 tests), watchdog (6 tests), filter on real devnet transactions | A full funded run on devnet (wallets need faucet funds) |
+| Policy (13 tests), watchdog (6 tests), audit receipts (8 tests), filter on real devnet transactions | A full funded run on devnet (wallets need faucet funds) |
 | Real x402 payment transactions decoded through the firewall signer | Claude agent loop against the live API (needs `ANTHROPIC_API_KEY`) |
 | Gemini public market data, order validation, approval flow | Gemini sandbox order signing (needs sandbox keys) |
 | Webhook verification and dashboard alert (simulated event) | A live QuickNode Stream delivering to the webhook |
+| Red team: 12 of 12 attacks stopped through the real signing door on devnet | Receipt memos landing on-chain (the agent wallet needs devnet SOL for fees) |

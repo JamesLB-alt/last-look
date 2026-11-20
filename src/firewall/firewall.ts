@@ -11,7 +11,11 @@ import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/t
 import { USDC_MINT } from "../config.ts";
 import { decodeWireTransaction, type Action } from "./decode.ts";
 import { evaluate, signals, type AgentContext, type Decision, type Policy, type Signals } from "./policy.ts";
+import { memoAnchor, policyHash, type Receipt, ReceiptLog } from "./receipt.ts";
 import { simulate, type Simulation } from "./simulate.ts";
+
+/** How long each stage of the check took. Human approval time is never counted. */
+export type Timing = { decodeMs: number; simulateMs: number; policyMs: number; totalMs: number };
 
 export type Event = {
   id: string;
@@ -26,6 +30,9 @@ export type Event = {
   finalDecision?: "allow" | "block";
   reasons: string[];
   decidedBy?: "policy" | "human" | "timeout";
+  timing: Timing;
+  /** Audit receipt: hash-chained, then anchored on Solana as a Memo transaction. */
+  receipt?: Pick<Receipt, "hash" | "anchor"> & { seq: number };
 };
 
 export type SignResult =
@@ -46,17 +53,29 @@ export class Firewall extends EventEmitter {
   private spentToday = 0n;
   private day = new Date().toDateString();
   private pending = new Map<string, (approved: boolean) => void>();
+  readonly receipts: ReceiptLog;
 
   private constructor(
     private readonly agent: KeyPairSigner,
     readonly agentAta: Address,
     readonly policy: Policy,
+    anchorOnChain: boolean,
   ) {
     super();
+    this.receipts = new ReceiptLog(
+      anchorOnChain ? memoAnchor(agent, (signature) => this.ourSignatures.add(signature)) : null,
+      (r) => {
+        const ev = this.events.find((e) => e.id === r.body.id);
+        if (!ev) return;
+        ev.receipt = { seq: r.body.seq, hash: r.hash, anchor: r.anchor };
+        this.update(ev);
+      },
+    );
   }
 
-  static async create(agent: KeyPairSigner, policy: Policy) {
-    return new Firewall(agent, await ataFor(agent.address), policy);
+  /** `anchor: false` keeps receipts local (hash chain only), e.g. in tests. */
+  static async create(agent: KeyPairSigner, policy: Policy, opts: { anchor?: boolean } = {}) {
+    return new Firewall(agent, await ataFor(agent.address), policy, opts.anchor ?? true);
   }
 
   get address() {
@@ -72,7 +91,9 @@ export class Firewall extends EventEmitter {
   async handleSign(wireBase64: string, context: AgentContext): Promise<SignResult> {
     this.rollDay();
     const id = randomUUID().slice(0, 8);
+    const t0 = performance.now();
     const decoded = decodeWireTransaction(wireBase64);
+    const t1 = performance.now();
 
     // Refuse to sign anything where our key isn't the one being asked for.
     if (!(this.agent.address in decoded.transaction.signatures)) {
@@ -80,6 +101,7 @@ export class Firewall extends EventEmitter {
     }
 
     const sim = await simulate(wireBase64, this.agentAta);
+    const t2 = performance.now();
     const sig = signals(decoded, sim, context, this.policy, this.spentToday);
     const recipients = [...new Set(decoded.actions.flatMap((a) => (a.kind === "token-transfer" ? [a.toAta] : [])))].map((ata) => ({
       ata,
@@ -88,18 +110,27 @@ export class Firewall extends EventEmitter {
         decoded.actions.find((a): a is Extract<Action, { kind: "create-ata" }> => a.kind === "create-ata" && a.ata === ata)?.owner ??
         null,
     }));
-    const { approved, event } = await this.decide(id, context, decoded.actions, recipients, sig, {
-      ok: sim.ok,
-      error: sim.error,
-      usdcDelta: sim.usdcDelta,
-    });
-    if (!approved) return { decision: "block", id, reasons: event.reasons };
+    const { approved, event } = await this.decide(
+      id,
+      context,
+      decoded.actions,
+      recipients,
+      sig,
+      { ok: sim.ok, error: sim.error, usdcDelta: sim.usdcDelta },
+      { decodeMs: t1 - t0, simulateMs: t2 - t1 },
+    );
+    if (!approved) {
+      this.seal(event, null);
+      return { decision: "block", id, reasons: event.reasons };
+    }
 
     const signed = await partiallySignTransaction([this.agent.keyPair], decoded.transaction);
     const sigBytes = signed.signatures[this.agent.address]!;
     // Remember every signature we produce, so the watchdog can tell our spends
     // apart from money that moved some other way (a leaked key).
-    this.ourSignatures.add(getBase58Decoder().decode(sigBytes));
+    const payment = getBase58Decoder().decode(sigBytes);
+    this.ourSignatures.add(payment);
+    this.seal(event, payment);
     return { decision: "allow", id, signature: getBase64Decoder().decode(sigBytes), reasons: event.reasons };
   }
 
@@ -126,11 +157,34 @@ export class Firewall extends EventEmitter {
       simulationFailed: false,
       simulationMismatch: false,
     };
-    return this.decide(id, spend.context, [], [{ ata: venueId, name: spend.venue, owner: null }], sig, {
-      ok: true,
-      error: null,
-      usdcDelta: null,
+    const result = await this.decide(
+      id,
+      spend.context,
+      [],
+      [{ ata: venueId, name: spend.venue, owner: null }],
+      sig,
+      { ok: true, error: null, usdcDelta: null },
+      { decodeMs: 0, simulateMs: 0 },
+    );
+    this.seal(result.event, null);
+    return result;
+  }
+
+  /** Write the audit receipt for a finished decision and queue its on-chain anchor. */
+  private seal(event: Event, payment: string | null) {
+    const r = this.receipts.append({
+      id: event.id,
+      at: event.at,
+      decision: event.finalDecision ?? "block",
+      decidedBy: event.decidedBy ?? "policy",
+      usdc: event.signals.outflow.toString(),
+      recipients: event.recipients.map((x) => x.name ?? x.owner ?? x.ata),
+      reasons: event.reasons,
+      policyHash: policyHash(this.policy),
+      payment,
     });
+    event.receipt = { seq: r.body.seq, hash: r.hash, anchor: r.anchor };
+    this.update(event);
   }
 
   /** Policy → (maybe a human) → record. Shared by on-chain and off-chain spends. */
@@ -141,10 +195,14 @@ export class Firewall extends EventEmitter {
     recipients: Event["recipients"],
     sig: Signals,
     simulation: Event["simulation"],
+    spent: { decodeMs: number; simulateMs: number },
   ) {
+    const p0 = performance.now();
     const verdict = this.frozen
       ? { decision: "block" as const, reasons: ["Spending is frozen by the owner. Nothing is signed until it's unfrozen."] }
       : evaluate(sig, this.policy);
+    const policyMs = performance.now() - p0;
+    const round = (n: number) => Math.round(n * 100) / 100;
 
     const event: Event = {
       id,
@@ -157,6 +215,12 @@ export class Firewall extends EventEmitter {
       decision: verdict.decision === "ask" ? "pending" : verdict.decision,
       reasons: verdict.reasons,
       decidedBy: verdict.decision === "ask" ? undefined : "policy",
+      timing: {
+        decodeMs: round(spent.decodeMs),
+        simulateMs: round(spent.simulateMs),
+        policyMs: round(policyMs),
+        totalMs: round(spent.decodeMs + spent.simulateMs + policyMs),
+      },
     };
     this.record(event);
 

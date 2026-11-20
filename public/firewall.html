@@ -116,6 +116,55 @@
   ul.reasons { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); }
   ul.reasons li { padding-left: 18px; position: relative; margin: 3px 0; }
   ul.reasons li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+  /* ---------- numbers strip ---------- */
+  .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 4px 0 8px; }
+  @media (max-width: 1080px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; min-width: 0; }
+  .stat .v { font-size: 26px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; margin-top: 4px; line-height: 1.15; }
+  .stat .v small { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .stat .s { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .stat .v.bad { color: var(--block); } .stat .v.good { color: var(--allow); }
+
+  /* ---------- edit limits ---------- */
+  .limits button { background: none; border: 0; padding: 0; height: auto; color: var(--accent); font: 500 12.5px var(--sans); cursor: pointer; margin-left: auto; }
+  #policy-form { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  #policy-form.show { display: block; }
+  #policy-form .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  #policy-form label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  #policy-form input { width: 100%; height: 36px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--panel); color: var(--ink); padding: 0 10px; font: 500 14px var(--sans); font-variant-numeric: tabular-nums; }
+  #policy-form .row2 { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  #policy-msg { font-size: 12.5px; color: var(--block); flex: 1; min-width: 0; }
+
+  /* ---------- red team ---------- */
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+  .rt-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .rt-head p { margin: 0; color: var(--muted); flex: 1; min-width: 240px; max-width: 70ch; }
+  .rt-score { font-size: 30px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .rt-score.good { color: var(--allow); } .rt-score.bad { color: var(--block); }
+  .rt-scroll { overflow-x: auto; margin-top: 14px; }
+  table.rt { width: 100%; border-collapse: collapse; min-width: 720px; }
+  table.rt th { text-align: left; font: 600 11px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line-2); }
+  table.rt td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.rt tr:last-child td { border-bottom: 0; }
+  table.rt .nm { font-weight: 500; }
+  table.rt .st { color: var(--muted); font-size: 13px; }
+  table.rt .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+
+  /* ---------- audit trail ---------- */
+  .audit-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .audit-head p { margin: 0; color: var(--muted); flex: 1; min-width: 240px; max-width: 70ch; }
+  #chain-status { font-weight: 500; }
+  .rc { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 4px 12px; padding: 11px 0; border-bottom: 1px solid var(--line); align-items: center; }
+  .rc:last-child { border-bottom: 0; }
+  .rc .seq { font: 500 13px var(--mono); color: var(--muted); }
+  .rc .memo { font: 400 12px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rc .anc { font-size: 12.5px; white-space: nowrap; }
+  .rc .anc a { color: var(--accent); }
+  #audit { margin-bottom: 90px; }
+  #feed { margin-bottom: 8px !important; }
+  .ev .meta a.chip { text-decoration: none; }
+
   #frozen-bar { background: var(--block); }
   #alert-bar { background: #7a1712; }
   #alert-bar.show { animation: flash .9s ease 3; }
@@ -162,6 +211,14 @@
 
   <div id="pending" aria-live="polite"></div>
 
+  <section class="stats" aria-label="Firewall numbers">
+    <div class="stat"><div class="label">Payments checked</div><div class="v" id="s-decisions">0</div><div class="s" id="s-decisions-s">none yet</div></div>
+    <div class="stat"><div class="label">Blocked</div><div class="v" id="s-blocked">0</div><div class="s" id="s-blocked-s">$0.00 kept in the wallet</div></div>
+    <div class="stat"><div class="label">Time to check</div><div class="v" id="s-ms">—</div><div class="s" id="s-ms-s">decode + dry run + policy</div></div>
+    <div class="stat"><div class="label">Attacks stopped</div><div class="v" id="s-rt">—</div><div class="s" id="s-rt-s">run the attack suite below</div></div>
+    <div class="stat"><div class="label">Receipts on Solana</div><div class="v" id="s-anchored">0</div><div class="s" id="s-anchored-s">audit trail is empty</div></div>
+  </section>
+
   <div class="section-head"><h2>Command <em class="accent">center</em></h2><span class="label" id="health-time"></span></div>
   <div class="grid">
     <!-- Wallet -->
@@ -188,6 +245,14 @@
         <div class="row"><span class="label">Today's budget</span><span><b id="spent">$0.00</b> <span style="color:var(--muted)">/ <span id="limit">$0.00</span></span></span></div>
         <div class="meter"><div id="meter"></div></div>
         <div class="limits" id="limits"></div>
+        <form id="policy-form" autocomplete="off">
+          <div class="fields">
+            <label>Per payment<input id="p-pertx" type="number" min="0.01" max="10000" step="0.01" required /></label>
+            <label>Per day<input id="p-daily" type="number" min="0.01" max="10000" step="0.01" required /></label>
+            <label>Ask me above<input id="p-ask" type="number" min="0.01" max="10000" step="0.01" required /></label>
+          </div>
+          <div class="row2"><span id="policy-msg" role="alert"></span><button type="button" class="sm" id="policy-cancel">Cancel</button><button type="submit" class="primary sm">Save limits</button></div>
+        </form>
       </div>
       <div class="tabs wallet-tabs" role="tablist">
         <button class="sel" data-wtab="assets" role="tab">Assets</button>
@@ -217,6 +282,16 @@
     </section>
   </div>
 
+  <div class="section-head" id="redteam"><h2>Try to <em class="accent">break</em> it</h2></div>
+  <section class="panel" aria-label="Red team">
+    <div class="rt-head">
+      <p>Fires every common way to drain a wallet at the real signing door: real Solana transactions, decoded, dry-run and judged by the same policy your agent faces. Nothing is signed unless the firewall says yes.</p>
+      <span class="rt-score" id="rt-score"></span>
+      <button class="primary" id="rt-run">Run attack suite</button>
+    </div>
+    <div id="rt-body"></div>
+  </section>
+
   <div class="section-head" id="activity"><h2>Every payment, <em class="accent">explained</em></h2>
     <div class="tabs" role="tablist" id="feed-tabs">
       <button class="sel" data-f="all">All<span class="n" id="c-all"></span></button>
@@ -226,6 +301,17 @@
     </div>
   </div>
   <div id="feed"></div>
+
+  <div class="section-head" id="audit-head"><h2>Audit trail, <em class="accent">on-chain</em></h2></div>
+  <section class="panel" id="audit" aria-label="Audit trail">
+    <div class="audit-head">
+      <p>Every decision becomes a receipt whose hash covers the one before it, so history can't be edited quietly. Each receipt is then written to Solana as a memo, with the policy that made the call.</p>
+      <span id="chain-status"></span>
+      <button class="sm" id="anchor-retry" hidden>Retry anchoring</button>
+      <button class="sm" id="chain-verify">Verify chain</button>
+    </div>
+    <div id="receipts"></div>
+  </section>
 </main>
 
 <script>
@@ -249,6 +335,12 @@ const ICON = {
 const events = new Map();
 const seen = new Set();
 let state = null, walletData = null, feedFilter = "all", walletTab = "assets";
+
+const explorerTx = (sig) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+const ms = (n) => n == null ? "—" : n < 1 ? "<1 ms" : Math.round(n) + " ms";
+const receiptChip = (r) => !r ? "" : r.anchor.status === "anchored"
+  ? `<a class="chip good" href="${explorerTx(r.anchor.signature)}" target="_blank" rel="noopener">receipt <b>#${r.seq}</b> on Solana ↗</a>`
+  : `<span class="chip" title="${esc(r.anchor.error || "")}">receipt <b>#${r.seq}</b>${r.anchor.status === "pending" ? " · anchoring…" : r.anchor.status === "failed" ? " · not anchored" : ""}</span>`;
 
 const VERDICT = { allow: ["good", "Allowed"], block: ["bad", "Blocked"], pending: ["mid", "Waiting for you"] };
 const verdictChip = (d) => `<span class="chip ${VERDICT[d]?.[0] || ""}">${VERDICT[d]?.[1] || d}</span>`;
@@ -299,6 +391,8 @@ function card(ev) {
     ...s.dangerousActions.map((a) => `<span class="chip bad">${esc(KIND[a.kind] || a.kind)}</span>`),
     s.simulationFailed ? `<span class="chip">simulation failed</span>` : "",
     ev.decidedBy && ev.decidedBy !== "policy" ? `<span class="chip">decided by <b>${esc(ev.decidedBy)}</b></span>` : "",
+    ev.timing ? `<span class="chip" title="decode ${ev.timing.decodeMs} ms · dry run ${ev.timing.simulateMs} ms · policy ${ev.timing.policyMs} ms">checked in <b>${ms(ev.timing.totalMs)}</b></span>` : "",
+    receiptChip(ev.receipt),
   ].join("");
   const hot = d === "block" && (ev.context.tainted || s.unknownRecipients.length) ? " hot" : "";
   const fresh = seen.has(ev.id) ? "" : " fresh"; seen.add(ev.id);
@@ -334,7 +428,7 @@ function renderWallet() {
   const { spentToday, dailyLimit } = state.budget;
   $("spent").textContent = fmt(spentToday); $("limit").textContent = fmt(dailyLimit);
   $("meter").style.width = Math.min(100, Number(spentToday) / Number(dailyLimit) * 100) + "%";
-  $("limits").innerHTML = `<span>per payment ≤ <b>${fmt(state.policy.perTxLimit)}</b></span><span>ask me above <b>${fmt(state.policy.askAbove)}</b></span>`;
+  $("limits").innerHTML = `<span>per payment ≤ <b>${fmt(state.policy.perTxLimit)}</b></span><span>ask me above <b>${fmt(state.policy.askAbove)}</b></span><button type="button" id="policy-edit">Edit limits</button>`;
   const frozen = state.frozen;
   $("wallet-status").className = "chip " + (frozen ? "solid-bad" : "good");
   $("wallet-status").textContent = frozen ? "Frozen" : "Guarded";
@@ -410,6 +504,112 @@ function renderAgent() {
   if (t && nearBottom) t.scrollTop = t.scrollHeight;
 }
 
+/* ---------- numbers strip ---------- */
+let stats = null;
+function renderStats() {
+  if (!stats) return;
+  const n = stats.decisions;
+  $("s-decisions").textContent = n;
+  $("s-decisions-s").textContent = n ? `${stats.allowed} allowed · ${stats.humanDecided} decided by you` : "none yet";
+  $("s-blocked").textContent = stats.blocked;
+  $("s-blocked").className = "v" + (stats.blocked ? " bad" : "");
+  $("s-blocked-s").textContent = `${fmt(stats.usdcBlocked)} kept in the wallet`;
+  $("s-ms").innerHTML = stats.medianCheckMs == null ? "—" : `${Math.round(stats.medianCheckMs)} <small>ms median</small>`;
+  $("s-ms-s").textContent = stats.medianLocalMs == null ? "decode + dry run + policy" : `${ms(stats.medianLocalMs)} of that is our code; the rest is the on-chain dry run`;
+  const rt = stats.redteam;
+  $("s-rt").textContent = rt ? `${rt.caught}/${rt.total}` : "—";
+  $("s-rt").className = "v" + (rt ? (rt.caught === rt.total ? " good" : " bad") : "");
+  $("s-rt-s").textContent = rt ? `last run ${hhmmss(rt.at)}` : "run the attack suite below";
+  $("s-anchored").innerHTML = `${stats.anchored} <small>of ${stats.receipts}</small>`;
+  $("s-anchored-s").textContent = !stats.receipts ? "audit trail is empty" : stats.chain.ok ? "hash chain intact" : `chain broken at #${stats.chain.brokenAt}`;
+  renderRedTeam(rt);
+}
+let statsSoon = null;
+async function loadStats() {
+  try { stats = await fetch("/api/stats").then((r) => r.json()); renderStats(); } catch {}
+}
+const refreshStatsSoon = () => { clearTimeout(statsSoon); statsSoon = setTimeout(() => { loadStats(); loadReceipts(); }, 400); };
+
+/* ---------- red team ---------- */
+function renderRedTeam(rt) {
+  if (!rt) {
+    $("rt-score").textContent = "";
+    $("rt-body").innerHTML = `<div class="empty" style="margin-top:14px">Not run yet. It takes a few seconds and needs no funds: blocked transactions are never broadcast.</div>`;
+    return;
+  }
+  $("rt-score").textContent = `${rt.caught}/${rt.total} stopped`;
+  $("rt-score").className = "rt-score " + (rt.caught === rt.total ? "good" : "bad");
+  $("rt-body").innerHTML = `<div class="rt-scroll"><table class="rt">
+    <thead><tr><th>Attack</th><th>Stopped by</th><th>Result</th><th>Why</th><th style="text-align:right">Check</th></tr></thead>
+    <tbody>${rt.results.map((r) => `<tr>
+      <td><div class="nm">${esc(r.name)}</div><div class="st">${esc(r.story)}</div></td>
+      <td><span class="chip">${esc(r.layer)}</span></td>
+      <td><span class="chip ${r.caught ? "bad" : "solid-bad"}">${esc(r.outcome)}</span></td>
+      <td class="st">${esc(r.reason)}</td>
+      <td class="num">${r.ms == null ? "—" : ms(r.ms)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+$("rt-run").onclick = async () => {
+  const b = $("rt-run"); b.disabled = true; b.textContent = "Attacking…";
+  try {
+    const r = await fetch("/api/redteam/run", { method: "POST" });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error || "The attack suite failed to run.");
+    stats = { ...(stats || {}), redteam: body }; renderRedTeam(body);
+    await loadStats(); loadReceipts();
+  } catch (e) {
+    $("rt-body").innerHTML = `<div class="empty" style="margin-top:14px">${esc(e.message)} Try again in a few seconds.</div>`;
+  }
+  b.disabled = false; b.textContent = "Run again";
+};
+
+/* ---------- audit trail ---------- */
+function renderReceipts(data) {
+  const list = data.receipts;
+  $("chain-status").innerHTML = !list.length ? "" : data.chain.ok
+    ? `<span class="ok">✓ ${data.chain.count} receipt${data.chain.count > 1 ? "s" : ""}, chain intact</span>`
+    : `<span class="bad">Chain broken at #${data.chain.brokenAt}</span>`;
+  $("anchor-retry").hidden = !list.some((r) => r.anchor.status === "failed");
+  $("receipts").innerHTML = list.length ? list.slice(0, 12).map((r) => `
+    <div class="rc"><span class="seq">#${r.body.seq}</span>
+      <span>${verdictChip(r.body.decision)} <b>${fmt(r.body.usdc)}</b> <span style="color:var(--muted)">→ ${esc(r.body.recipients.map((x) => x.length > 30 ? short(x) : x).join(", ") || "no transfer")}</span></span>
+      <span class="anc">${r.anchor.status === "anchored" ? `<a href="${explorerTx(r.anchor.signature)}" target="_blank" rel="noopener">View on Solana ↗</a>`
+        : r.anchor.status === "pending" ? "anchoring…" : r.anchor.status === "off" ? "local only" : `<span title="${esc(r.anchor.error)}" style="color:var(--muted)">not anchored: ${esc(r.anchor.error)}</span>`}</span>
+      <span></span><span class="memo" title="${esc(r.memo)}">${esc(r.memo)}</span><span></span></div>`).join("")
+      + (list.length > 12 ? `<div class="empty" style="margin-top:8px">Showing the latest 12 of ${list.length}.</div>` : "")
+    : `<div class="empty" style="margin-top:14px">No receipts yet. The first decision starts the chain.</div>`;
+}
+async function loadReceipts() {
+  try { renderReceipts(await fetch("/api/receipts").then((r) => r.json())); } catch {}
+}
+$("anchor-retry").onclick = async () => {
+  $("anchor-retry").hidden = true;
+  await fetch("/api/receipts/anchor", { method: "POST" });
+  loadReceipts();
+};
+$("chain-verify").onclick = async () => {
+  $("chain-status").textContent = "Verifying…";
+  await loadReceipts();
+};
+
+/* ---------- edit limits ---------- */
+document.addEventListener("click", (e) => {
+  if (e.target.id !== "policy-edit" || !state) return;
+  $("p-pertx").value = Number(state.policy.perTxLimit) / 1e6;
+  $("p-daily").value = Number(state.policy.dailyLimit) / 1e6;
+  $("p-ask").value = Number(state.policy.askAbove) / 1e6;
+  $("policy-msg").textContent = "";
+  $("policy-form").classList.add("show");
+});
+$("policy-cancel").onclick = () => $("policy-form").classList.remove("show");
+$("policy-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const r = await fetch("/api/policy", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ perTxLimit: +$("p-pertx").value, dailyLimit: +$("p-daily").value, askAbove: +$("p-ask").value }) });
+  if (!r.ok) { $("policy-msg").textContent = (await r.json()).error || "Couldn't save."; return; }
+  $("policy-form").classList.remove("show");
+  await loadState(); loadWallet(); loadStats();
+};
+
 /* ---------- data ---------- */
 async function loadState() {
   state = await fetch("/api/state").then((r) => r.json());
@@ -435,10 +635,11 @@ function connect() {
     if (msg.type === "agent") { state.session = msg.session; return renderAgent(); }
     if (msg.type === "freeze") { state.frozen = msg.frozen; renderWallet(); return refreshWalletSoon(); }
     if (msg.type === "alert") return showAlert(msg);
+    if (msg.type === "policy") { loadState(); return refreshWalletSoon(); }
     const changed = !events.has(msg.id) || events.get(msg.id).decision !== msg.decision;
     events.set(msg.id, msg);
     if (changed) eye.react(msg.decision);
-    loadState(); refreshWalletSoon();
+    loadState(); refreshWalletSoon(); refreshStatsSoon();
   };
 }
 function showAlert(a) {
@@ -517,7 +718,7 @@ const eye = (() => {
   } };
 })();
 
-loadState().then(() => { connect(); loadWallet(); });
+loadState().then(() => { connect(); loadWallet(); loadStats(); loadReceipts(); });
 </script>
 </body>
 </html>

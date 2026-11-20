@@ -9,6 +9,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237d5cff'/%3E%3Cpath d='M5.5 16C9 10.6 12.4 8.6 16 8.6S23 10.6 26.5 16C23 21.4 19.6 23.4 16 23.4S9 21.4 5.5 16Z' fill='none' stroke='white' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='4.4' fill='white'/%3E%3Ccircle cx='17.5' cy='14.6' r='1.5' fill='%236a46ee'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="/theme.css" />
+<style>
+  .how a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .panel-code { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 20px; margin-bottom: 90px; }
+  .panel-code p { margin: 0 0 14px; color: var(--muted); max-width: 72ch; }
+  .panel-code pre { margin: 0; padding: 16px 18px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--line); overflow-x: auto; font: 400 13px/1.65 var(--mono); color: var(--ink); }
+  .panel-code .c { color: var(--dim); }
+</style>
 </head>
 <body>
 <div class="announce"><div class="wrap"><span class="dot on"></span><span><b>Live on Solana devnet.</b><span class="long"> One engine checks every transaction before it's signed, for people and for companies.</span></span><a href="/personal.html">Check your wallet →</a></div></div>
@@ -61,6 +68,29 @@
     <div><div class="n">01 · Decode</div><h4>Read every instruction</h4><p>Transfers, approvals, ownership changes, account closes and unknown programs, pulled out of the raw transaction.</p></div>
     <div><div class="n">02 · Simulate</div><h4>Dry-run it on-chain</h4><p>See the real balance change before a signature exists, so hidden transfers can't sneak past the description.</p></div>
     <div><div class="n">03 · Decide</div><h4>Explain, then stop or allow</h4><p>People get a plain-English verdict. Agents get a policy decision: sign, ask a human, or refuse.</p></div>
+  </section>
+
+  <div class="section-head"><h2>Built to be <em class="accent">checked</em></h2></div>
+  <section class="how">
+    <div><div class="n">Red team</div><h4>12 attacks, one button</h4><p>Injected transfers, unlimited approvals, ownership takeovers, hidden programs and a leaked key, fired at the real signing door. See which layer stops each one.</p><p><a href="/firewall.html#redteam">Run the attack suite →</a></p></div>
+    <div><div class="n">Audit trail</div><h4>Every decision, on Solana</h4><p>Allowed or blocked, each decision becomes a hash-chained receipt written to Solana as a memo, with the policy that made the call. History can't be edited quietly.</p><p><a href="/firewall.html#audit-head">See the receipts →</a></p></div>
+    <div><div class="n">Speed</div><h4>Milliseconds, measured</h4><p>The check is a decode, one on-chain dry run and a policy pass. The dashboard shows the real time for every payment, not a marketing number.</p><p><a href="/firewall.html">Open the dashboard →</a></p></div>
+  </section>
+
+  <div class="section-head"><h2>Drop it into <em class="accent">any</em> agent</h2></div>
+  <section class="panel-code">
+    <p>Last Look is a standard Solana signer that holds no key. Anything that accepts a signer, including x402 payments and your own transfers, is guarded with no other changes.</p>
+<pre><code><span class="c">// The agent process never sees a private key.</span>
+import { createFirewallSigner } from "./client/firewallSigner.ts";
+
+const signer = createFirewallSigner(agentAddress, () => ({
+  tool: "fetch_paid_api",
+  purpose: "premium rates data",
+  tainted: agentHasReadUntrustedContent,
+}));
+
+<span class="c">// Use it anywhere a signer goes. A blocked payment throws, with the reasons.</span>
+await sendUsdc(signer, vendor, 0.05);</code></pre>
   </section>
 </main>
 </body>

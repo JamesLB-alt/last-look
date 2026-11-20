@@ -12,6 +12,8 @@ import { checkup, examples, inspect } from "./personal.ts";
 import { classify, describe as describeLeak, verifyQuickNode } from "./watchdog.ts";
 import { hasSandboxKeys, type Order, orderCost, placeSandboxOrder, validateOrder } from "./gemini.ts";
 import { publicAddress } from "./keys.ts";
+import { policyHash, verifyChain } from "./firewall/receipt.ts";
+import { type AttackResult, runRedTeam } from "./redteam.ts";
 
 // The ONLY process that loads the agent's private key.
 const agent = await loadOrCreate("agent");
@@ -19,12 +21,17 @@ const seller = await loadOrCreate("seller");
 
 const trusted: Trusted[] = [{ name: "DataCo API", owner: seller.address, ata: await ataFor(seller.address) }];
 
-const firewall = await Firewall.create(agent, {
-  perTxLimit: usdc(5),
-  dailyLimit: usdc(20),
-  askAbove: usdc(1),
-  allowlist: new Map(trusted.map((t) => [t.ata, t.name])),
-});
+const firewall = await Firewall.create(
+  agent,
+  {
+    perTxLimit: usdc(5),
+    dailyLimit: usdc(20),
+    askAbove: usdc(1),
+    allowlist: new Map(trusted.map((t) => [t.ata, t.name])),
+  },
+  // Receipts are anchored on Solana by default. LASTLOOK_ANCHOR=off keeps them local.
+  { anchor: process.env.LASTLOOK_ANCHOR !== "off" },
+);
 
 // Out-of-band watchdog state, fed by the QuickNode Stream webhook.
 const STREAM_TOKEN = process.env.QUICKNODE_STREAM_TOKEN ?? "";
@@ -81,6 +88,7 @@ app.get("/api/state", (_req, res) => {
       frozen: firewall.frozen,
       // Maps don't survive JSON.stringify, so flatten the allowlist.
       policy: { ...firewall.policy, allowlist: Object.fromEntries(firewall.policy.allowlist) },
+      policyHash: policyHash(firewall.policy),
       session,
       events: firewall.events,
     }),
@@ -96,6 +104,74 @@ app.post("/api/freeze", (req, res) => {
   firewall.frozen = req.body?.frozen === true;
   broadcast({ type: "freeze", frozen: firewall.frozen });
   res.json({ frozen: firewall.frozen });
+});
+
+// ---- Limits: the owner can retune them live. Every receipt records which policy was in force.
+app.post("/api/policy", (req, res) => {
+  const dollars = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v * 100) / 100 : NaN);
+  const perTx = dollars(req.body?.perTxLimit), daily = dollars(req.body?.dailyLimit), ask = dollars(req.body?.askAbove);
+  if ([perTx, daily, ask].some((n) => Number.isNaN(n) || n <= 0 || n > 10_000)) return res.status(400).json({ error: "Each limit must be between $0.01 and $10,000." });
+  if (ask > perTx) return res.status(400).json({ error: "The ask-me threshold can't be above the per-payment limit." });
+  if (perTx > daily) return res.status(400).json({ error: "The per-payment limit can't be above the daily budget." });
+  Object.assign(firewall.policy, { perTxLimit: usdc(perTx), dailyLimit: usdc(daily), askAbove: usdc(ask) });
+  broadcast({ type: "policy" });
+  res.type("json").send(json({ ok: true, policyHash: policyHash(firewall.policy) }));
+});
+
+// ---- Numbers: what the firewall has done, and how fast -------------------------
+const percentile = (sorted: number[], p: number) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] : null);
+app.get("/api/stats", (_req, res) => {
+  const done = firewall.events.filter((e) => e.decision !== "pending");
+  const onchain = done.filter((e) => e.timing.simulateMs > 0).map((e) => e.timing.totalMs).sort((a, b) => a - b);
+  const policyOnly = done.map((e) => e.timing.policyMs + e.timing.decodeMs).sort((a, b) => a - b);
+  const sum = (d: string) => done.filter((e) => e.decision === d).reduce((s, e) => s + e.signals.outflow, 0n);
+  const receipts = firewall.receipts.receipts;
+  res.type("json").send(
+    json({
+      decisions: done.length,
+      allowed: done.filter((e) => e.decision === "allow").length,
+      blocked: done.filter((e) => e.decision === "block").length,
+      humanDecided: done.filter((e) => e.decidedBy === "human").length,
+      usdcBlocked: sum("block"),
+      usdcAllowed: sum("allow"),
+      // Full check = decode + on-chain simulation + policy. The simulation is a network round trip.
+      medianCheckMs: percentile(onchain, 0.5),
+      p95CheckMs: percentile(onchain, 0.95),
+      // Our own code only (decode + policy), with the network taken out.
+      medianLocalMs: percentile(policyOnly, 0.5),
+      receipts: receipts.length,
+      anchored: receipts.filter((r) => r.anchor.status === "anchored").length,
+      chain: verifyChain(receipts),
+      policyHash: policyHash(firewall.policy),
+      redteam: lastRedTeam,
+    }),
+  );
+});
+
+// ---- Audit trail: hash-chained receipts, anchored on Solana as Memo transactions
+app.get("/api/receipts", (_req, res) => {
+  res.type("json").send(json({ chain: verifyChain(firewall.receipts.receipts), receipts: [...firewall.receipts.receipts].reverse() }));
+});
+
+app.post("/api/receipts/anchor", (_req, res) => {
+  res.json({ retried: firewall.receipts.retryFailed() });
+});
+
+// ---- Red team: fire every known drain technique at the real signing door -------
+let lastRedTeam: { at: string; caught: number; total: number; results: AttackResult[] } | null = null;
+let redTeamRunning = false;
+app.post("/api/redteam/run", async (_req, res) => {
+  if (redTeamRunning) return res.status(409).json({ error: "The attack suite is already running." });
+  redTeamRunning = true;
+  try {
+    const results = await runRedTeam(firewall, { seller: seller.address, attacker: await publicAddress("attacker") });
+    lastRedTeam = { at: new Date().toISOString(), caught: results.filter((r) => r.caught).length, total: results.length, results };
+    res.type("json").send(json(lastRedTeam));
+  } catch (e) {
+    res.status(502).json({ error: `Couldn't run the attack suite: ${(e as Error).message}` });
+  } finally {
+    redTeamRunning = false;
+  }
 });
 
 // Express 5 dropped inline regex params, so validate the action by hand.
