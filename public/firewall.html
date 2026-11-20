@@ -165,6 +165,47 @@
   #feed { margin-bottom: 8px !important; }
   .ev .meta a.chip { text-decoration: none; }
 
+  /* ---------- guided demo ---------- */
+  .demo { margin: 4px 0 16px; }
+  .demo .rt-head .label { margin-bottom: 4px; }
+  #demo-score { font-size: 20px; }
+  .demo-note { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--ask-tint); font-size: 13.5px; }
+  .demo-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; counter-reset: d; }
+  .demo-steps:empty { display: none; }
+  @media (max-width: 1080px) { .demo-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .demo-steps { grid-template-columns: minmax(0, 1fr); } }
+  .dstep { counter-increment: d; border: 1px solid var(--line); background: var(--panel-2); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; transition: opacity .3s, border-color .3s; }
+  .dstep.todo { opacity: .5; }
+  .dstep.running { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .dstep.waiting { border-color: color-mix(in srgb, var(--ask) 55%, transparent); background: var(--ask-tint); }
+  .dstep .hd { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+  .dstep .hd::before { content: counter(d); flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--sans); background: var(--line-2); color: var(--ink); }
+  .dstep.running .hd::before { background: var(--accent); color: #fff; animation: pulse 1.2s ease infinite; }
+  .dstep p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .dstep .res { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .dstep .res .as { font-size: 12.5px; }
+  .dstep .dt { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .dstep .dt a { color: var(--accent); }
+
+  /* ---------- rule tester ---------- */
+  .whatif { margin-top: 12px; }
+  .whatif form { display: flex; gap: 10px 14px; align-items: end; flex-wrap: wrap; margin-top: 12px; }
+  .whatif label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  .whatif label.cb { flex-direction: row; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink); height: 40px; cursor: pointer; }
+  .whatif label.cb input { width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }
+  .whatif input[type=number] { width: 120px; height: 40px; padding: 0 12px; font-variant-numeric: tabular-nums; }
+  select { font: 400 14px var(--sans); height: 40px; background: var(--panel-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: 12px; padding: 0 12px; max-width: 100%; }
+  #wi-out { margin-top: 14px; display: flex; gap: 10px; align-items: flex-start; min-height: 28px; }
+  #wi-out ul { margin: 2px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 13.5px; }
+
+  /* ---------- trusted recipients ---------- */
+  #trust-form { display: none; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  #trust-form.show { display: block; }
+  #trust-form .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; }
+  #trust-form input { height: 36px; padding: 0 10px; border-radius: 10px; font-size: 13.5px; min-width: 0; }
+  #trust-msg { font-size: 12.5px; color: var(--block); margin-top: 6px; min-height: 1em; }
+  @media (max-width: 420px) { #trust-form .fields { grid-template-columns: minmax(0, 1fr); } }
+
   #frozen-bar { background: var(--block); }
   #alert-bar { background: #7a1712; }
   #alert-bar.show { animation: flash .9s ease 3; }
@@ -210,6 +251,17 @@
   </section>
 
   <div id="pending" aria-live="polite"></div>
+
+  <section class="panel demo" id="demo" aria-label="Guided demo">
+    <div class="rt-head">
+      <div style="flex:1;min-width:240px"><div class="label">Guided demo</div>
+        <p>Watch the whole story in about 30 seconds: a normal payment, a prompt injection, a hidden approval, a leaked key, the kill switch, and a purchase that needs your OK. Every payment goes through the real signing door.</p></div>
+      <span class="rt-score" id="demo-score"></span>
+      <button class="primary" id="demo-run">Run the demo</button>
+    </div>
+    <div class="demo-note" id="demo-note" hidden></div>
+    <ol class="demo-steps" id="demo-steps" aria-live="polite"></ol>
+  </section>
 
   <section class="stats" aria-label="Firewall numbers">
     <div class="stat"><div class="label">Payments checked</div><div class="v" id="s-decisions">0</div><div class="s" id="s-decisions-s">none yet</div></div>
@@ -259,6 +311,14 @@
         <button data-wtab="trusted" role="tab">Trusted<span class="n" id="n-trusted"></span></button>
       </div>
       <div class="list" id="wallet-list"></div>
+      <form id="trust-form" autocomplete="off">
+        <div class="fields">
+          <input id="t-name" placeholder="Name, e.g. Helius" maxlength="40" required aria-label="Recipient name" />
+          <input id="t-addr" class="mono" placeholder="Solana wallet address" required aria-label="Recipient wallet address" />
+          <button type="submit" class="primary sm">Trust</button>
+        </div>
+        <div id="trust-msg" role="alert"></div>
+      </form>
     </section>
 
     <!-- Security health -->
@@ -291,6 +351,15 @@
     </div>
     <div id="rt-body"></div>
   </section>
+  <section class="panel whatif" aria-label="Test your rules">
+    <div class="label">What would happen if…</div>
+    <form id="wi-form" autocomplete="off">
+      <label>The agent tried to pay<input id="wi-amt" type="number" min="0" step="0.01" value="3" aria-label="Amount in dollars" /></label>
+      <label>to<select id="wi-to" aria-label="Recipient"></select></label>
+      <label class="cb"><input id="wi-taint" type="checkbox" />after reading untrusted content</label>
+    </form>
+    <div id="wi-out" aria-live="polite"></div>
+  </section>
 
   <div class="section-head" id="activity"><h2>Every payment, <em class="accent">explained</em></h2>
     <div class="tabs" role="tablist" id="feed-tabs">
@@ -305,10 +374,11 @@
   <div class="section-head" id="audit-head"><h2>Audit trail, <em class="accent">on-chain</em></h2></div>
   <section class="panel" id="audit" aria-label="Audit trail">
     <div class="audit-head">
-      <p>Every decision becomes a receipt whose hash covers the one before it, so history can't be edited quietly. Each receipt is then written to Solana as a memo, with the policy that made the call.</p>
+      <p>Every decision becomes a receipt whose hash covers the one before it, so history can't be edited quietly. Each receipt is then written to Solana as a memo, with the policy that made the call. Download the report and check it yourself with <code>npm run audit:verify</code>.</p>
       <span id="chain-status"></span>
       <button class="sm" id="anchor-retry" hidden>Retry anchoring</button>
       <button class="sm" id="chain-verify">Verify chain</button>
+      <a class="btn sm" id="audit-export" href="/api/receipts/export" download>Download report</a>
     </div>
     <div id="receipts"></div>
   </section>
@@ -448,8 +518,10 @@ function renderWallet() {
     <div class="item"><div class="token usdc">$</div><div class="grow"><div class="t1">USD Coin</div><div class="t2">Spendable by the agent</div></div><div class="r"><div class="t1">${usd(w.usdc)}</div><div class="t2">${w.usdc.toFixed(2)} USDC</div></div></div>
     <div class="item"><div class="token sol">◎</div><div class="grow"><div class="t1">Solana</div><div class="t2">Network fees only</div></div><div class="r"><div class="t1">${w.sol === null ? "—" : w.sol.toFixed(3)}</div><div class="t2">SOL</div></div></div>`
   : w.trusted.map((t) => `
-    <div class="item"><div class="token ven">${ICON.ok}</div><div class="grow"><div class="t1">${esc(t.name)}</div><div class="t2"><a href="${explorer(t.owner)}" target="_blank" rel="noopener">${short(t.owner)}</a> · allowlisted</div></div><div class="r"><div class="t2">auto-pay ≤ ${fmt(state.policy.askAbove)}</div></div></div>`).join("")
+    <div class="item"><div class="token ven">${ICON.ok}</div><div class="grow"><div class="t1">${esc(t.name)}</div><div class="t2"><a href="${explorer(t.owner)}" target="_blank" rel="noopener">${short(t.owner)}</a> · allowlisted</div></div><div class="r"><div class="t2">auto-pay ≤ ${fmt(state.policy.askAbove)}</div></div><button class="icon-btn" data-untrust="${esc(t.ata)}" title="Stop trusting ${esc(t.name)}" aria-label="Stop trusting ${esc(t.name)}">${ICON.fail}</button></div>`).join("")
     || `<div class="empty">No trusted recipients. Every payment will need approval.</div>`;
+  $("trust-form").classList.toggle("show", walletTab === "trusted");
+  fillWhatIf(w.trusted);
 }
 
 /* ---------- health ---------- */
@@ -528,7 +600,7 @@ let statsSoon = null;
 async function loadStats() {
   try { stats = await fetch("/api/stats").then((r) => r.json()); renderStats(); } catch {}
 }
-const refreshStatsSoon = () => { clearTimeout(statsSoon); statsSoon = setTimeout(() => { loadStats(); loadReceipts(); }, 400); };
+const refreshStatsSoon = () => { clearTimeout(statsSoon); statsSoon = setTimeout(() => { loadStats(); loadReceipts(); whatIf(); }, 400); };
 
 /* ---------- red team ---------- */
 function renderRedTeam(rt) {
@@ -610,6 +682,83 @@ $("policy-form").onsubmit = async (e) => {
   await loadState(); loadWallet(); loadStats();
 };
 
+/* ---------- guided demo ---------- */
+let demo = null;
+const DEMO_CHIP = { Blocked: "bad", "Alert raised": "bad", "Waiting for you": "mid", "Not approved": "bad", Missed: "solid-bad", Signed: "solid-bad" };
+function renderDemo() {
+  if (!demo) return;
+  const running = demo.status === "running";
+  $("demo-run").disabled = running;
+  $("demo-run").textContent = running ? "Playing…" : demo.status === "done" ? "Run it again" : "Run the demo";
+  $("demo-note").hidden = !demo.note;
+  $("demo-note").textContent = demo.note || "";
+  const judged = demo.steps.filter((s) => s.ok !== null);
+  const right = judged.filter((s) => s.ok).length;
+  $("demo-score").textContent = judged.length ? `${right}/${judged.length} as expected` : "";
+  $("demo-score").className = "rt-score " + (right === judged.length ? "good" : "bad");
+  $("demo-steps").innerHTML = demo.steps.map((s) => `
+    <li class="dstep ${s.status}">
+      <div class="hd">${esc(s.title)}</div>
+      <p>${esc(s.story)}</p>
+      ${s.outcome ? `<div class="res"><span class="chip ${DEMO_CHIP[s.outcome] || (s.outcome.startsWith("Signed,") ? "mid" : "good")}">${esc(s.outcome)}</span>${
+        s.ok === true ? `<span class="as ok">✓ as it should</span>` : s.ok === false ? `<span class="as bad">✗ not what should happen</span>` : ""}</div>` : ""}
+      ${s.status === "waiting" ? `<div class="dt"><b>Approve or deny it in the yellow bar above.</b></div>` : ""}
+      ${s.detail ? `<div class="dt">${esc(s.detail)}${s.link ? ` <a href="${esc(s.link)}" target="_blank" rel="noopener">View on Solana ↗</a>` : ""}</div>` : ""}
+    </li>`).join("");
+}
+$("demo-run").onclick = async () => {
+  $("demo-run").disabled = true;
+  const r = await fetch("/api/demo/run", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  if (r.ok) { demo = await r.json(); renderDemo(); }
+  $("demo").scrollIntoView({ behavior: "smooth", block: "start" });
+};
+async function loadDemo() {
+  try { demo = await fetch("/api/demo").then((r) => r.json()); renderDemo(); } catch {}
+}
+
+/* ---------- rule tester ---------- */
+let whatIfKey = "", whatIfSoon = null;
+function fillWhatIf(trusted) {
+  const key = trusted.map((t) => t.ata + t.name).join("|");
+  if (key === whatIfKey) return;
+  whatIfKey = key;
+  const sel = $("wi-to"), was = sel.value;
+  sel.innerHTML = trusted.map((t) => `<option value="${esc(t.ata)}">${esc(t.name)} (trusted)</option>`).join("") + `<option value="">a wallet you've never paid</option>`;
+  if ([...sel.options].some((o) => o.value === was)) sel.value = was;
+  whatIf();
+}
+async function whatIf() {
+  const amount = parseFloat($("wi-amt").value);
+  if (!Number.isFinite(amount)) { $("wi-out").innerHTML = ""; return; }
+  try {
+    const r = await fetch("/api/policy/preview", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ amount, recipient: $("wi-to").value, tainted: $("wi-taint").checked }) });
+    const v = await r.json();
+    if (!r.ok) { $("wi-out").innerHTML = `<span class="bad">${esc(v.error)}</span>`; return; }
+    const chip = { allow: ["good", "Signed automatically"], ask: ["mid", "You'd be asked"], block: ["bad", "Blocked"] }[v.decision];
+    $("wi-out").innerHTML = `<span class="chip ${chip[0]}">${chip[1]}</span><ul>${v.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+  } catch {}
+}
+$("wi-form").oninput = () => { clearTimeout(whatIfSoon); whatIfSoon = setTimeout(whatIf, 150); };
+$("wi-form").onsubmit = (e) => e.preventDefault();
+
+/* ---------- trusted recipients ---------- */
+$("trust-form").onsubmit = async (e) => {
+  e.preventDefault();
+  $("trust-msg").textContent = "";
+  const r = await fetch("/api/allowlist", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: $("t-name").value, address: $("t-addr").value }) });
+  if (!r.ok) { $("trust-msg").textContent = (await r.json()).error || "Couldn't add that recipient."; return; }
+  $("t-name").value = ""; $("t-addr").value = "";
+  await loadState(); loadWallet(); loadStats();
+};
+$("wallet-list").onclick = async (e) => {
+  const b = e.target.closest("[data-untrust]"); if (!b) return;
+  b.disabled = true;
+  await fetch("/api/allowlist/" + encodeURIComponent(b.dataset.untrust), { method: "DELETE" });
+  await loadState(); loadWallet(); loadStats();
+};
+
 /* ---------- data ---------- */
 async function loadState() {
   state = await fetch("/api/state").then((r) => r.json());
@@ -633,9 +782,10 @@ function connect() {
   es.onmessage = (m) => {
     const msg = JSON.parse(m.data);
     if (msg.type === "agent") { state.session = msg.session; return renderAgent(); }
-    if (msg.type === "freeze") { state.frozen = msg.frozen; renderWallet(); return refreshWalletSoon(); }
+    if (msg.type === "freeze") { state.frozen = msg.frozen; renderWallet(); whatIf(); return refreshWalletSoon(); }
     if (msg.type === "alert") return showAlert(msg);
-    if (msg.type === "policy") { loadState(); return refreshWalletSoon(); }
+    if (msg.type === "policy") { whatIf(); loadState(); return refreshWalletSoon(); }
+    if (msg.type === "demo") { demo = msg.demo; return renderDemo(); }
     const changed = !events.has(msg.id) || events.get(msg.id).decision !== msg.decision;
     events.set(msg.id, msg);
     if (changed) eye.react(msg.decision);
@@ -718,7 +868,7 @@ const eye = (() => {
   } };
 })();
 
-loadState().then(() => { connect(); loadWallet(); loadStats(); loadReceipts(); });
+loadState().then(() => { connect(); loadWallet(); loadStats(); loadReceipts(); loadDemo(); });
 </script>
 </body>
 </html>

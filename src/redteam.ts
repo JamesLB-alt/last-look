@@ -13,6 +13,7 @@ import {
   getBase64EncodedWireTransaction,
   type Instruction,
   pipe,
+  type TransactionSigner,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
 } from "@solana/kit";
@@ -47,6 +48,20 @@ export type AttackResult = {
 };
 
 type Parties = { seller: Address; attacker: Address };
+type Blockhash = Parameters<typeof setTransactionMessageLifetimeUsingBlockhash>[0];
+
+/** Compile an UNSIGNED transaction exactly the way an agent's SDK would hand it to the firewall. */
+export const unsignedWire = (feePayer: TransactionSigner, blockhash: Blockhash, instructions: Instruction[]) =>
+  getBase64EncodedWireTransaction(
+    compileTransaction(
+      pipe(
+        createTransactionMessage({ version: 0 }),
+        (m) => setTransactionMessageFeePayerSigner(feePayer, m),
+        (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m),
+        (m) => appendTransactionMessageInstructions(instructions, m),
+      ),
+    ),
+  );
 
 export async function runRedTeam(firewall: Firewall, { seller, attacker }: Parties): Promise<AttackResult[]> {
   const agent = firewall.address;
@@ -54,18 +69,7 @@ export async function runRedTeam(firewall: Firewall, { seller, attacker }: Parti
   const [agentAta, sellerAta, attackerAta] = await Promise.all([ataFor(agent), ataFor(seller), ataFor(attacker)]);
   const { value: blockhash } = await rpc.getLatestBlockhash().send();
 
-  // Compile an unsigned transaction exactly the way an agent's SDK would hand it over.
-  const wire = (instructions: Instruction[], feePayer = noop) =>
-    getBase64EncodedWireTransaction(
-      compileTransaction(
-        pipe(
-          createTransactionMessage({ version: 0 }),
-          (m) => setTransactionMessageFeePayerSigner(feePayer, m),
-          (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m),
-          (m) => appendTransactionMessageInstructions(instructions, m),
-        ),
-      ),
-    );
+  const wire = (instructions: Instruction[], feePayer: TransactionSigner = noop) => unsignedWire(feePayer, blockhash, instructions);
 
   const pay = (to: Address, toAta: Address, dollars: number) => [
     getCreateAssociatedTokenIdempotentInstruction({ payer: noop, ata: toAta, owner: to, mint: USDC_MINT }),

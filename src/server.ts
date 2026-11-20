@@ -1,4 +1,5 @@
 import express from "express";
+import { address, type Address } from "@solana/kit";
 import { PORT, usdc } from "./config.ts";
 import { ataFor, Firewall } from "./firewall/firewall.ts";
 import type { AgentContext } from "./firewall/policy.ts";
@@ -14,6 +15,7 @@ import { hasSandboxKeys, type Order, orderCost, placeSandboxOrder, validateOrder
 import { publicAddress } from "./keys.ts";
 import { policyHash, verifyChain } from "./firewall/receipt.ts";
 import { type AttackResult, runRedTeam } from "./redteam.ts";
+import { createDemo } from "./demo.ts";
 
 // The ONLY process that loads the agent's private key.
 const agent = await loadOrCreate("agent");
@@ -100,9 +102,12 @@ app.get("/api/wallet", async (_req, res) => {
   res.type("json").send(json({ wallet, health: healthReport(firewall, wallet, watchdog()) }));
 });
 
+function setFrozen(frozen: boolean) {
+  firewall.frozen = frozen;
+  broadcast({ type: "freeze", frozen });
+}
 app.post("/api/freeze", (req, res) => {
-  firewall.frozen = req.body?.frozen === true;
-  broadcast({ type: "freeze", frozen: firewall.frozen });
+  setFrozen(req.body?.frozen === true);
   res.json({ frozen: firewall.frozen });
 });
 
@@ -116,6 +121,44 @@ app.post("/api/policy", (req, res) => {
   Object.assign(firewall.policy, { perTxLimit: usdc(perTx), dailyLimit: usdc(daily), askAbove: usdc(ask) });
   broadcast({ type: "policy" });
   res.type("json").send(json({ ok: true, policyHash: policyHash(firewall.policy) }));
+});
+
+// "What would happen if…": the verdict the current rules would give, without signing anything.
+app.post("/api/policy/preview", (req, res) => {
+  const dollars = Number(req.body?.amount);
+  if (!Number.isFinite(dollars) || dollars < 0 || dollars > 1_000_000) return res.status(400).json({ error: "Enter an amount in dollars." });
+  const known = typeof req.body?.recipient === "string" && firewall.policy.allowlist.has(req.body.recipient as Address);
+  const verdict = firewall.preview(usdc(dollars), known, req.body?.tainted === true);
+  res.json({ ...verdict, recipient: known ? firewall.policy.allowlist.get(req.body.recipient as Address) : null });
+});
+
+// ---- Trusted recipients: the owner decides who the agent may pay without asking.
+// The allowlist is part of the policy fingerprint, so every receipt shows which list was in force.
+app.post("/api/allowlist", async (req, res) => {
+  const name = String(req.body?.name ?? "").trim().slice(0, 40);
+  if (!name) return res.status(400).json({ error: "Give the recipient a name." });
+  let owner: Address;
+  try {
+    owner = address(String(req.body?.address ?? "").trim());
+  } catch {
+    return res.status(400).json({ error: "That isn't a valid Solana wallet address." });
+  }
+  if (owner === firewall.address) return res.status(400).json({ error: "That's the agent's own wallet." });
+  const ata = await ataFor(owner);
+  if (firewall.policy.allowlist.has(ata)) return res.status(400).json({ error: `Already trusted as ${firewall.policy.allowlist.get(ata)}.` });
+  trusted.push({ name, owner, ata });
+  firewall.policy.allowlist.set(ata, name);
+  broadcast({ type: "policy" });
+  res.json({ ok: true, policyHash: policyHash(firewall.policy) });
+});
+
+app.delete("/api/allowlist/:ata", (req, res) => {
+  const i = trusted.findIndex((t) => t.ata === req.params.ata);
+  if (i < 0) return res.status(404).json({ error: "Not on the list." });
+  firewall.policy.allowlist.delete(trusted[i]!.ata);
+  trusted.splice(i, 1);
+  broadcast({ type: "policy" });
+  res.json({ ok: true, policyHash: policyHash(firewall.policy) });
 });
 
 // ---- Numbers: what the firewall has done, and how fast -------------------------
@@ -157,6 +200,66 @@ app.post("/api/receipts/anchor", (_req, res) => {
   res.json({ retried: firewall.receipts.retryFailed() });
 });
 
+// A self-contained report anyone can check without trusting this server:
+// `npm run audit:verify -- <file>` recomputes the hash chain and looks up each memo on Solana.
+app.get("/api/receipts/export", (_req, res) => {
+  const receipts = firewall.receipts.receipts;
+  const p = firewall.policy;
+  const stamp = new Date().toISOString();
+  res
+    .set("content-disposition", `attachment; filename="last-look-audit-${stamp.slice(0, 19).replace(/[:T]/g, "-")}.json"`)
+    .type("json")
+    .send(
+      JSON.stringify(
+        {
+          format: "lastlook-audit/v1",
+          generatedAt: stamp,
+          network: "solana-devnet",
+          agentWallet: firewall.address,
+          memoProgram: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+          policy: {
+            hash: policyHash(p),
+            perTxLimitUsdc: Number(p.perTxLimit) / 1e6,
+            dailyLimitUsdc: Number(p.dailyLimit) / 1e6,
+            askAboveUsdc: Number(p.askAbove) / 1e6,
+            allowlist: trusted.map((t) => ({ name: t.name, wallet: t.owner, usdcAccount: t.ata })),
+          },
+          chain: verifyChain(receipts),
+          howToVerify:
+            "hash = sha256(prev + JSON.stringify(body)); the first prev is 64 zeros. Each anchored receipt's memo is in the Solana transaction at anchor.signature, signed by agentWallet. Run: npm run audit:verify -- <this file>",
+          receipts,
+        },
+        null,
+        2,
+      ),
+    );
+});
+
+// ---- Guided demo: one click plays the whole story through the real signing door
+const demo = createDemo({
+  firewall,
+  seller: seller.address,
+  attacker: await publicAddress("attacker"),
+  publish: (state) => broadcast({ type: "demo", demo: state }),
+  agent: agentEvent,
+  simulateLeak: () => {
+    const signature = `DemoLeak${Date.now().toString(36)}`;
+    const { outOfBand } = ingestStream({ matches: [{ signature, signatures: [signature], blockTime: null, usdcDelta: -12, solDelta: 0 }] }, true);
+    return outOfBand.length ? watchdogState.alerts[0]!.message : null;
+  },
+  setFrozen,
+  balances: async () => {
+    const w = await walletSnapshot(firewall, trusted);
+    return { sol: w.sol, usdc: w.usdc };
+  },
+});
+app.get("/api/demo", (_req, res) => res.json(demo.state));
+app.post("/api/demo/run", (req, res) => {
+  const pace = typeof req.body?.pace === "number" ? req.body.pace : undefined;
+  if (!demo.start(pace)) return res.status(409).json({ error: "The demo is already playing." });
+  res.json(demo.state);
+});
+
 // ---- Red team: fire every known drain technique at the real signing door -------
 let lastRedTeam: { at: string; caught: number; total: number; results: AttackResult[] } | null = null;
 let redTeamRunning = false;
@@ -184,22 +287,25 @@ app.post("/api/pending/:id/:action", (req, res) => {
 
 // The agent process reports its own steps here so the dashboard can show them.
 // This is display-only: nothing here can make the firewall sign anything.
-app.post("/api/agent/event", (req, res) => {
-  const e = req.body ?? {};
+function agentEvent(e: Record<string, unknown>) {
   const now = new Date().toISOString();
   if (e.type === "start") {
     Object.assign(session, { status: "running", model: String(e.model ?? ""), question: String(e.question ?? ""), naive: !!e.naive, tainted: false, startedAt: now, steps: [] });
-  } else if (e.type === "step" && ["tool", "text", "taint", "error"].includes(e.kind)) {
+  } else if (e.type === "step" && ["tool", "text", "taint", "error"].includes(e.kind as string)) {
     if (e.kind === "taint") session.tainted = true;
-    session.steps.push({ at: now, kind: e.kind, text: String(e.text ?? "").slice(0, 600), tool: e.tool ? String(e.tool) : undefined });
+    session.steps.push({ at: now, kind: e.kind as AgentStep["kind"], text: String(e.text ?? "").slice(0, 600), tool: e.tool ? String(e.tool) : undefined });
     session.steps = session.steps.slice(-60);
   } else if (e.type === "done") {
     session.status = "done";
   } else {
-    return res.status(400).json({ ok: false });
+    return false;
   }
   broadcast({ type: "agent", session });
-  res.json({ ok: true });
+  return true;
+}
+app.post("/api/agent/event", (req, res) => {
+  const ok = agentEvent(req.body ?? {});
+  res.status(ok ? 200 : 400).json({ ok });
 });
 
 // ---- Code Guard: clients whose codebases we scan ------------------------------
@@ -257,6 +363,19 @@ app.post("/api/clients/:id/explain", async (req, res) => {
 });
 
 // ---- QuickNode Streams webhook: the out-of-band watchdog ---------------------
+/** Sort a stream payload into our spends and out-of-band ones, and raise an alert for each of the latter. */
+function ingestStream(body: unknown, simulated: boolean) {
+  const now = new Date().toISOString();
+  const split = classify(body, firewall.ourSignatures);
+  for (const m of split.outOfBand) {
+    const message = (simulated ? "SIMULATED TEST: " : "") + describeLeak(m);
+    watchdogState.alerts.unshift({ at: now, message, signature: m.signature });
+    broadcast({ type: "alert", message, signature: m.signature });
+  }
+  watchdogState.alerts = watchdogState.alerts.slice(0, 20);
+  return split;
+}
+
 app.post("/api/stream/webhook", (req, res) => {
   const raw = (req as unknown as { rawBody?: Buffer }).rawBody ?? Buffer.from("");
   if (STREAM_TOKEN && !verifyQuickNode(raw, req.headers, STREAM_TOKEN)) return res.status(401).json({ ok: false });
@@ -264,13 +383,7 @@ app.post("/api/stream/webhook", (req, res) => {
   const simulated = req.body?.selftest === true;
   const now = new Date().toISOString();
   if (!simulated) watchdogState.lastEventAt = now;
-  const { ours, outOfBand } = classify(req.body, firewall.ourSignatures);
-  for (const m of outOfBand) {
-    const message = (simulated ? "SIMULATED TEST: " : "") + describeLeak(m);
-    watchdogState.alerts.unshift({ at: now, message, signature: m.signature });
-    broadcast({ type: "alert", message, signature: m.signature });
-  }
-  watchdogState.alerts = watchdogState.alerts.slice(0, 20);
+  const { ours, outOfBand } = ingestStream(req.body, simulated);
   res.json({ ok: true, ours: ours.length, outOfBand: outOfBand.length, verified: !!STREAM_TOKEN, simulated });
 });
 

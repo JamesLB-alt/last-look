@@ -106,6 +106,8 @@ Every decision, allowed or blocked, becomes a receipt in `src/firewall/receipt.t
 - **Bound to the policy and the payment.** The receipt includes a fingerprint of the limits in force and, for an allowed payment, the signature of the transaction Last Look signed.
 - **Invisible to the watchdog.** The firewall records its own receipt signatures, so the QuickNode Stream never mistakes a receipt for a leaked-key spend.
 
+- **Checkable without trusting us.** **Download report** on the dashboard exports every receipt as JSON. `npm run audit:verify -- <file>` recomputes the hash chain, checks each memo against its receipt, and looks up each anchor transaction on Solana to confirm the memo is on-chain and signed by the agent wallet.
+
 Anchoring runs after the decision and never delays it. If the wallet has no SOL, the receipt stays in the local chain and **Retry anchoring** sends it later. Set `LASTLOOK_ANCHOR=off` to keep receipts local.
 
 ---
@@ -155,6 +157,12 @@ This covers the one gap a signing firewall can't see: money moved *without* aski
 
 ---
 
+## On the dashboard
+
+- **Run the demo.** One click plays six scenes in about 30 seconds: a normal payment, a prompt injection, a hidden unlimited approval, a leaked key, the kill switch, and a purchase that needs approval. Each payment goes out through the same drop-in signer and `POST /sign` door a real agent uses, and each scene shows what the firewall did and whether that was the right call. The agent's "thoughts" are scripted and labelled `scripted demo · no LLM`; the leaked-key event is simulated. The Claude-driven agent is `npm run agent`.
+- **What would happen if…** Enter an amount, pick a recipient, tick "after reading untrusted content", and see the verdict the current rules would give. It is read-only: nothing is signed, recorded or counted against the budget.
+- **Edit limits and trusted recipients.** Change the per-payment limit, daily budget and ask-me threshold, or add and remove trusted wallets. The policy fingerprint in every later receipt changes with them.
+
 ## Run it
 
 ```bash
@@ -174,7 +182,8 @@ Fund the **agent** with devnet SOL ([faucet.solana.com](https://faucet.solana.co
 | `npm run demo:transfer [-- --dry]` | Three scripted payments: allow, block (injection), ask |
 | `npm run demo:leak` | Spends with the raw key, bypassing the firewall (the watchdog demo) |
 | `npm run redteam` | Fires the 12-attack suite at the running firewall and prints the scoreboard |
-| `npm test` | Policy, watchdog and audit-receipt unit tests |
+| `npm run audit:verify -- <file>` | Checks a downloaded audit report: hash chain, memos, and anchors on Solana |
+| `npm test` | Policy, policy-preview, watchdog and audit-receipt unit tests |
 | `npm run test:filter` | QuickNode filter against real devnet transactions |
 | `npm run watchdog:selftest` | Simulated Stream event → dashboard alert |
 
@@ -191,8 +200,10 @@ Pages: `/` (landing), `/personal.html` (individuals), `/firewall.html` (agent fi
 
 | Verified | Not yet verified |
 |---|---|
-| Policy (13 tests), watchdog (6 tests), audit receipts (8 tests), filter on real devnet transactions | A full funded run on devnet (wallets need faucet funds) |
+| Policy (13 tests), policy preview (6 tests), watchdog (6 tests), audit receipts (8 tests), filter on real devnet transactions | A full funded run on devnet (wallets need faucet funds) |
 | Real x402 payment transactions decoded through the firewall signer | Claude agent loop against the live API (needs `ANTHROPIC_API_KEY`) |
 | Gemini public market data, order validation, approval flow | Gemini sandbox order signing (needs sandbox keys) |
 | Webhook verification and dashboard alert (simulated event) | A live QuickNode Stream delivering to the webhook |
 | Red team: 12 of 12 attacks stopped through the real signing door on devnet | Receipt memos landing on-chain (the agent wallet needs devnet SOL for fees) |
+| Guided demo: 6 of 6 scenes behave as expected with an unfunded wallet (blocks, alert, freeze, approvals) | Guided demo with a funded wallet (auto-approved payment landing on devnet) |
+| Audit report export; `audit:verify` passes a real report and fails a tampered one | `audit:verify` on-chain lookup (needs anchored receipts) |

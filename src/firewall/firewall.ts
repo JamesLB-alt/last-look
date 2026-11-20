@@ -10,7 +10,7 @@ import {
 import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import { USDC_MINT } from "../config.ts";
 import { decodeWireTransaction, type Action } from "./decode.ts";
-import { evaluate, signals, type AgentContext, type Decision, type Policy, type Signals } from "./policy.ts";
+import { evaluate, signals, type AgentContext, type Decision, type Policy, type Signals, type Verdict } from "./policy.ts";
 import { memoAnchor, policyHash, type Receipt, ReceiptLog } from "./receipt.ts";
 import { simulate, type Simulation } from "./simulate.ts";
 
@@ -143,20 +143,7 @@ export class Firewall extends EventEmitter {
     this.rollDay();
     const id = randomUUID().slice(0, 8);
     const venueId = `offchain:${spend.venue}` as Address;
-    const p = this.policy;
-    const sig: Signals = {
-      outflow: spend.amount,
-      spentToday: this.spentToday,
-      overPerTx: spend.amount > p.perTxLimit,
-      overDaily: this.spentToday + spend.amount > p.dailyLimit,
-      overAskThreshold: spend.amount > p.askAbove,
-      unknownRecipients: spend.trusted ? [] : [venueId],
-      dangerousActions: [],
-      solOut: 0n,
-      tainted: spend.context.tainted,
-      simulationFailed: false,
-      simulationMismatch: false,
-    };
+    const sig = this.plainSignals(spend.amount, spend.trusted ? [] : [venueId], spend.context.tainted);
     const result = await this.decide(
       id,
       spend.context,
@@ -168,6 +155,34 @@ export class Firewall extends EventEmitter {
     );
     this.seal(result.event, null);
     return result;
+  }
+
+  /** Signals for a spend with no transaction behind it: just an amount, a recipient and a context. */
+  private plainSignals(amount: bigint, unknownRecipients: Address[], tainted: boolean): Signals {
+    const p = this.policy;
+    return {
+      outflow: amount,
+      spentToday: this.spentToday,
+      overPerTx: amount > p.perTxLimit,
+      overDaily: this.spentToday + amount > p.dailyLimit,
+      overAskThreshold: amount > p.askAbove,
+      unknownRecipients,
+      dangerousActions: [],
+      solOut: 0n,
+      tainted,
+      simulationFailed: false,
+      simulationMismatch: false,
+    };
+  }
+
+  /**
+   * "What would happen if…": the verdict the current rules would give a plain USDC
+   * payment. Read-only: nothing is recorded, signed, or counted against the budget.
+   */
+  preview(amount: bigint, trustedRecipient: boolean, tainted: boolean): Verdict {
+    this.rollDay();
+    if (this.frozen) return { decision: "block", reasons: ["Spending is frozen by the owner. Nothing is signed until it's unfrozen."] };
+    return evaluate(this.plainSignals(amount, trustedRecipient ? [] : ["unknown" as Address], tainted), this.policy);
   }
 
   /** Write the audit receipt for a finished decision and queue its on-chain anchor. */

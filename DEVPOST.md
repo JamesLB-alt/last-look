@@ -26,6 +26,7 @@ AI agents are getting wallets, and agents read the open web. A single hidden ins
 - A QuickNode Stream (Solana devnet, Block dataset, custom filter) reports every outflow from the agent wallet. Anything without a Last Look signature raises an out-of-band alert.
 - **On-chain audit trail:** every decision, allowed or blocked, becomes a hash-chained receipt written to Solana as a Memo transaction, with a fingerprint of the policy that made the call. Nobody can quietly edit why a payment was approved.
 - **Built-in red team:** one button fires 12 real drain techniques (injected transfers, unlimited approvals, ownership takeovers, unknown programs, a leaked key) at the real signing door. 12 of 12 are stopped, and the dashboard shows which layer stopped each one and how long the check took (about 155 ms median, under 1 ms of it our own code).
+- **One-click guided demo, rule tester and audit export:** the dashboard plays the whole story through the real signing door, lets the owner ask "what would happen if the agent tried to pay $X to Y?", edit limits and trusted wallets live, and download the audit trail. `npm run audit:verify` checks that file against Solana without trusting our server.
 
 ### What makes it unique?
 It works at the **signer**, not the prompt. Prompt filters and model guardrails can be talked around. A key the agent never holds can't be. It's agent-aware too: it knows *why* the agent is paying and whether it has read untrusted content, which a generic wallet policy engine doesn't. And it explains every decision in plain English on a live dashboard with a one-click kill switch. It is also checkable: you can attack it yourself with one button, and verify every past decision against Solana.
@@ -37,6 +38,13 @@ Mobile push approvals, more chains, per-agent policies for teams with many agent
 Solana devnet, @solana/kit, SPL Token, x402 (@x402/svm, @x402/fetch, @x402/express), QuickNode Streams, Gemini Prediction Markets API, Claude (Anthropic API), TypeScript, Node.js, Express.
 
 ---
+
+### Demo video script, short version (about 1:30, no terminal)
+1. **0:00** Open `/firewall.html`. "An AI agent with a wallet. Last Look is the only thing that can sign for it."
+2. **0:10** Click **Run the demo** and read each scene aloud as it lights up: normal payment, poisoned web page **blocked**, unlimited approval **blocked**, leaked key **alert**, **Freeze**, then click **Approve** on the last one.
+3. **0:50** Click **Run attack suite**: 12 of 12 stopped.
+4. **1:05** "What would happen if…": type $0.50 to an unknown wallet after reading untrusted content → **Blocked**.
+5. **1:15** Audit trail: open one receipt on the Solana explorer, then **Download report**.
 
 ### Demo video script (2:45)
 1. **0:00** Landing page: "One engine, two markets." Click **For business**.
