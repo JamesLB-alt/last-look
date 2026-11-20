@@ -212,7 +212,7 @@
 </style>
 </head>
 <body>
-<div class="announce"><div class="wrap"><span class="dot on"></span><span><b>Live on Solana devnet.</b><span class="long"> Every payment your AI agent attempts is decoded, simulated and checked before it's signed.</span></span><a href="/clients.html">Scan client code →</a></div></div>
+<div class="announce"><div class="wrap"><span class="dot on"></span><span><b id="net-live">Live on Solana devnet.</b><span class="long"> Every payment your AI agent attempts is decoded, simulated and checked before it's signed.</span></span><a href="/clients.html">Scan client code →</a></div></div>
 
 <header class="top">
   <div class="wrap">
@@ -221,7 +221,7 @@
       <a href="/personal.html"><span class="long">For individuals</span><span class="short">Individuals</span></a>
       <a href="/firewall.html" aria-current="page"><span class="long">For business</span><span class="short">Business</span></a>
     </nav>
-    <span class="pill hide-sm"><span class="dot" id="live"></span>Devnet</span>
+    <span class="pill hide-sm"><span class="dot" id="live"></span><span id="net-short">Devnet</span></span>
     <button class="danger sm" id="freeze-top" title="Stop the agent from spending anything"><span>Freeze<span class="long"> spending</span></span></button>
   </div>
 </header>
@@ -390,7 +390,8 @@ const fmt = (units) => "$" + (Number(units) / 1e6).toFixed(2);
 const usd = (n) => "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const short = (a) => a ? a.slice(0, 4) + "…" + a.slice(-4) : "?";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const explorer = (a) => `https://explorer.solana.com/address/${a}?cluster=devnet`;
+let netQuery = "cluster=devnet";
+const explorer = (a) => `https://explorer.solana.com/address/${a}?${netQuery}`;
 const hhmmss = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 const ICON = {
@@ -406,7 +407,7 @@ const events = new Map();
 const seen = new Set();
 let state = null, walletData = null, feedFilter = "all", walletTab = "assets";
 
-const explorerTx = (sig) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+const explorerTx = (sig) => `https://explorer.solana.com/tx/${sig}?${netQuery}`;
 const ms = (n) => n == null ? "—" : n < 1 ? "<1 ms" : Math.round(n) + " ms";
 const receiptChip = (r) => !r ? "" : r.anchor.status === "anchored"
   ? `<a class="chip good" href="${explorerTx(r.anchor.signature)}" target="_blank" rel="noopener">receipt <b>#${r.seq}</b> on Solana ↗</a>`
@@ -763,6 +764,11 @@ $("wallet-list").onclick = async (e) => {
 async function loadState() {
   state = await fetch("/api/state").then((r) => r.json());
   for (const e of state.events) events.set(e.id, e);
+  if (state.network) {
+    netQuery = state.network.explorerQuery;
+    $("net-short").textContent = state.network.short;
+    $("net-live").textContent = state.network.id === "solana-devnet" ? "Live on Solana devnet." : "Running on a local Solana validator.";
+  }
   avatar($("avatar"), state.agent);
   renderWallet(); renderActivity(); renderAgent();
 }

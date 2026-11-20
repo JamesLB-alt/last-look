@@ -1,4 +1,4 @@
-// npm run audit:verify -- <report.json> [--offline]
+// npm run audit:verify -- <report.json> [--offline] [--rpc <url>]
 // Checks a downloaded Last Look audit report WITHOUT trusting the server that made it:
 //   1. recomputes every receipt hash and the chain linking them
 //   2. checks each memo is the one its receipt commits to
@@ -9,14 +9,16 @@ import { createSolanaRpc, type Signature } from "@solana/kit";
 import { RPC_URL } from "../src/config.ts";
 import { memoFor, type Receipt, verifyChain } from "../src/firewall/receipt.ts";
 
-const file = process.argv.slice(2).find((a) => !a.startsWith("--"));
+const args = process.argv.slice(2);
+const rpcFlag = args.includes("--rpc") ? args[args.indexOf("--rpc") + 1] : undefined;
+const file = args.find((a) => !a.startsWith("--") && a !== rpcFlag);
 const offline = process.argv.includes("--offline");
 if (!file) {
   console.error("Usage: npm run audit:verify -- <report.json> [--offline]");
   process.exit(2);
 }
 
-const report = JSON.parse(readFileSync(file, "utf8")) as { format?: string; agentWallet: string; receipts: Receipt[] };
+const report = JSON.parse(readFileSync(file, "utf8")) as { format?: string; network?: string; agentWallet: string; receipts: Receipt[] };
 if (report.format !== "lastlook-audit/v1" || !Array.isArray(report.receipts)) {
   console.error("That isn't a Last Look audit report (expected format lastlook-audit/v1).");
   process.exit(2);
@@ -48,7 +50,10 @@ if (offline) {
 } else if (!anchored.length) {
   console.log("  · no receipts are anchored on Solana yet, so there is nothing to look up");
 } else {
-  const rpc = createSolanaRpc(RPC_URL);
+  // Look where the report says its receipts live: a local-validator report can't be found on devnet.
+  const url = rpcFlag ?? process.env.SOLANA_RPC_URL ?? (report.network === "solana-localnet" ? "http://127.0.0.1:8899" : RPC_URL);
+  console.log(`  · looking up anchors on ${report.network ?? "solana"} via ${new URL(url).host}`);
+  const rpc = createSolanaRpc(url);
   let found = 0;
   for (const r of anchored) {
     try {

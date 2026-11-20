@@ -40,6 +40,7 @@ Solana devnet, @solana/kit, SPL Token, x402 (@x402/svm, @x402/fetch, @x402/expre
 ---
 
 ### Demo video script, short version (about 1:30, no terminal)
+0. Before recording: `npm run local` (a local Solana validator with pre-funded test wallets; the page shows "Localnet").
 1. **0:00** Open `/firewall.html`. "An AI agent with a wallet. Last Look is the only thing that can sign for it."
 2. **0:10** Click **Run the demo** and read each scene aloud as it lights up: normal payment, poisoned web page **blocked**, unlimited approval **blocked**, leaked key **alert**, **Freeze**, then click **Approve** on the last one.
 3. **0:50** Click **Run attack suite**: 12 of 12 stopped.

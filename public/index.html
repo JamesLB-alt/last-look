@@ -18,7 +18,7 @@
 </style>
 </head>
 <body>
-<div class="announce"><div class="wrap"><span class="dot on"></span><span><b>Live on Solana devnet.</b><span class="long"> One engine checks every transaction before it's signed, for people and for companies.</span></span><a href="/personal.html">Check your wallet →</a></div></div>
+<div class="announce"><div class="wrap"><span class="dot on"></span><span><b id="net-live">Live on Solana devnet.</b><span class="long"> One engine checks every transaction before it's signed, for people and for companies.</span></span><a href="/personal.html">Check your wallet →</a></div></div>
 
 <header class="top">
   <div class="wrap">
@@ -93,5 +93,6 @@ const signer = createFirewallSigner(agentAddress, () => ({
 await sendUsdc(signer, vendor, 0.05);</code></pre>
   </section>
 </main>
+<script>fetch("/api/network").then((r) => r.json()).then((n) => { if (n.id !== "solana-devnet") document.getElementById("net-live").textContent = "Running on a local Solana validator."; }).catch(() => {});</script>
 </body>
 </html>

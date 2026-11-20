@@ -8,7 +8,7 @@ import { type Address, createNoopSigner } from "@solana/kit";
 import { getApproveInstruction } from "@solana-program/token";
 import { createFirewallSigner, FirewallBlockedError } from "./client/firewallSigner.ts";
 import { sendUsdc } from "./client/transfer.ts";
-import { explorerTx, fmtUsdc, usdc } from "./config.ts";
+import { explorerTx, fmtUsdc, NETWORK, usdc } from "./config.ts";
 import type { Event, Firewall } from "./firewall/firewall.ts";
 import type { AgentContext } from "./firewall/policy.ts";
 import { rpc } from "./firewall/simulate.ts";
@@ -49,8 +49,14 @@ export type DemoDeps = {
   publish: (state: DemoState) => void;
   /** Drive the "AI agent" card (same shape the real agent process reports). */
   agent: (event: Record<string, unknown>) => void;
-  /** Raise a SIMULATED out-of-band spend through the real watchdog path. Returns the alert text. */
-  simulateLeak: () => string | null;
+  /**
+   * An out-of-band spend. With `real`, a genuine transaction signed with the raw key,
+   * never shown to the firewall; otherwise a SIMULATED event through the same watchdog path.
+   * Resolves with the alert the watchdog raised, or null if it missed it.
+   */
+  leak: (real: boolean) => Promise<{ message: string | null; signature: string | null }>;
+  /** Is something actually watching the chain (so a real leak would be noticed)? */
+  watching: boolean;
   setFrozen: (frozen: boolean) => void;
   balances: () => Promise<{ sol: number | null; usdc: number }>;
 };
@@ -94,7 +100,7 @@ export function createDemo(deps: DemoDeps) {
             step,
             asked ? "ask" : "allow",
             `${asked ? "You approved it" : "Allowed"}${broadcast ? " · paid on Solana" : " · signed"}`,
-            broadcast ? `${fmtUsdc(usdc(dollars))} landed on devnet.` : "Signed by the firewall. Not broadcast, because the wallet isn't funded.",
+            broadcast ? `${fmtUsdc(usdc(dollars))} landed on ${NETWORK.short.toLowerCase()}.` : "Signed by the firewall. Not broadcast, because the wallet isn't funded.",
             { eventId: eventId(), link: broadcast ? explorerTx(signature) : null },
           ),
         (e: unknown) => {
@@ -142,7 +148,11 @@ export function createDemo(deps: DemoDeps) {
 
     // Can payments land? Decisions are real either way; only the broadcast depends on funds.
     const bal = await deps.balances().catch(() => ({ sol: null, usdc: 0 }));
-    state.funded = (bal.sol ?? 0) >= 0.005 && bal.usdc >= big + small * 2;
+    state.funded = (bal.sol ?? 0) >= 0.005 && bal.usdc >= big + small * 2 + 1;
+    const realLeak = state.funded && deps.watching;
+    if (realLeak) {
+      leak.story = "An attacker with a stolen key sends $1.00 straight to their own wallet and never asks the firewall. This is a real transaction; the on-chain watchdog has to notice it.";
+    }
     state.note = state.funded
       ? null
       : "The agent wallet isn't funded yet, so nothing can be dry-run or paid. The firewall fails safe: payments it would normally auto-approve go to you instead, and every block works exactly the same.";
@@ -184,8 +194,14 @@ export function createDemo(deps: DemoDeps) {
 
     // 4. Money that never touches the firewall.
     await begin(leak);
-    const alert = deps.simulateLeak();
-    finish(leak, alert ? "alert" : "allow", alert ? "Alert raised" : "Missed", alert ?? "The watchdog did not flag the spend.");
+    const spill = await deps.leak(realLeak).catch((e: unknown) => ({ message: null, signature: null, error: (e as Error).message }));
+    finish(
+      leak,
+      spill.message ? "alert" : "allow",
+      spill.message ? "Alert raised" : "Missed",
+      spill.message ?? ("error" in spill ? `Couldn't send the leak transaction: ${spill.error.slice(0, 120)}` : "The watchdog did not flag the spend."),
+      { link: spill.signature ? explorerTx(spill.signature) : null },
+    );
     await sleep(pace);
 
     // 5. Kill switch.

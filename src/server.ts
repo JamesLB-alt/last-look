@@ -1,6 +1,8 @@
 import express from "express";
 import { address, type Address } from "@solana/kit";
-import { PORT, usdc } from "./config.ts";
+import { IS_LOCAL, NETWORK, PORT, usdc } from "./config.ts";
+import { startChainWatch } from "./chainwatch.ts";
+import { sendUsdc } from "./client/transfer.ts";
 import { ataFor, Firewall } from "./firewall/firewall.ts";
 import type { AgentContext } from "./firewall/policy.ts";
 import { loadOrCreate } from "./keys.ts";
@@ -39,9 +41,12 @@ const firewall = await Firewall.create(
 const STREAM_TOKEN = process.env.QUICKNODE_STREAM_TOKEN ?? "";
 const watchdogState = { lastEventAt: null as string | null, alerts: [] as { at: string; message: string; signature: string }[] };
 // "Connected" means we actually heard from the stream recently (its heartbeat is ~1/min).
+// On a local validator (or with LASTLOOK_WATCH=rpc) the built-in chain watcher does the same job by polling.
+const CHAIN_WATCH = IS_LOCAL || process.env.LASTLOOK_WATCH === "rpc";
 const watchdog = () => ({
-  connected: !!watchdogState.lastEventAt && Date.now() - Date.parse(watchdogState.lastEventAt) < 5 * 60_000,
+  connected: !!watchdogState.lastEventAt && Date.now() - Date.parse(watchdogState.lastEventAt) < (CHAIN_WATCH ? 20_000 : 5 * 60_000),
   lastEventAt: watchdogState.lastEventAt,
+  source: CHAIN_WATCH ? "Built-in chain watcher" : "QuickNode Stream",
 });
 
 // What the agent is doing right now, reported by the agent process itself.
@@ -91,6 +96,7 @@ app.get("/api/state", (_req, res) => {
       // Maps don't survive JSON.stringify, so flatten the allowlist.
       policy: { ...firewall.policy, allowlist: Object.fromEntries(firewall.policy.allowlist) },
       policyHash: policyHash(firewall.policy),
+      network: NETWORK,
       session,
       events: firewall.events,
     }),
@@ -214,7 +220,7 @@ app.get("/api/receipts/export", (_req, res) => {
         {
           format: "lastlook-audit/v1",
           generatedAt: stamp,
-          network: "solana-devnet",
+          network: NETWORK.id,
           agentWallet: firewall.address,
           memoProgram: "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
           policy: {
@@ -242,10 +248,22 @@ const demo = createDemo({
   attacker: await publicAddress("attacker"),
   publish: (state) => broadcast({ type: "demo", demo: state }),
   agent: agentEvent,
-  simulateLeak: () => {
-    const signature = `DemoLeak${Date.now().toString(36)}`;
-    const { outOfBand } = ingestStream({ matches: [{ signature, signatures: [signature], blockTime: null, usdcDelta: -12, solDelta: 0 }] }, true);
-    return outOfBand.length ? watchdogState.alerts[0]!.message : null;
+  watching: CHAIN_WATCH,
+  leak: async (real) => {
+    if (!real) {
+      const signature = `DemoLeak${Date.now().toString(36)}`;
+      const { outOfBand } = ingestStream({ matches: [{ signature, signatures: [signature], blockTime: null, usdcDelta: -12, solDelta: 0 }] }, true);
+      return { message: outOfBand.length ? watchdogState.alerts[0]!.message : null, signature: null };
+    }
+    // The "stolen key": sign with the raw keypair and broadcast, never calling handleSign.
+    // The firewall has no record of this signature, which is exactly what the watcher looks for.
+    const { signature } = await sendUsdc(agent, await publicAddress("attacker"), 1);
+    for (let i = 0; i < 40; i++) {
+      const hit = watchdogState.alerts.find((a) => a.signature === signature);
+      if (hit) return { message: hit.message, signature };
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return { message: null, signature };
   },
   setFrozen,
   balances: async () => {
@@ -458,7 +476,19 @@ app.get("/events", (req, res) => {
   req.on("close", () => firewall.off("event", send));
 });
 
+app.get("/api/network", (_req, res) => res.json(NETWORK));
+
+if (CHAIN_WATCH) {
+  startChainWatch(
+    firewall.address,
+    firewall.agentAta,
+    (matches) => ingestStream({ matches }, false),
+    () => (watchdogState.lastEventAt = new Date().toISOString()),
+  );
+}
+
 app.listen(PORT, "127.0.0.1", () => {
+  console.log(`   network: ${NETWORK.name}${CHAIN_WATCH ? " · built-in chain watcher on" : ""}`);
   console.log(`🛡️  Last Look firewall on http://127.0.0.1:${PORT}`);
   console.log(`   guarding agent wallet ${firewall.address}`);
 });

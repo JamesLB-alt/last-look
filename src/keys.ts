@@ -13,7 +13,8 @@ import {
 //   agent    – the AI agent's wallet. ONLY the firewall process loads this.
 //   seller   – our mock x402 data vendor (allowlisted merchant)
 //   attacker – the prompt-injection attacker's wallet (for the demo)
-export type KeyName = "agent" | "seller" | "attacker";
+//   faucet   – local validator only: mint authority for the test USDC (npm run local)
+export type KeyName = "agent" | "seller" | "attacker" | "faucet";
 
 const DIR = new URL("../keys/", import.meta.url);
 

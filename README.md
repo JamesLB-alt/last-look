@@ -172,10 +172,27 @@ npm run setup                 # creates devnet wallets, shows what to fund
 npm run dev                   # firewall + dashboard on :4020, mock x402 vendor on :4021
 ```
 
+### No faucet? Run it on a local Solana network
+
+```bash
+brew install solana           # once: provides solana-test-validator
+npm run local                 # validator + funded wallets + firewall + dashboard, one command
+```
+
+`npm run local` starts a private Solana validator on your machine (the real runtime, with the Token and Memo programs), gives the agent 5 SOL and $100 of **test USDC**, and starts everything against it. Open `http://127.0.0.1:4020/firewall.html` and click **Run the demo**. Payments land, receipts are written on-chain as memos, and `npm run audit:verify` confirms them against the chain.
+
+Two things differ from devnet, and the dashboard says so ("Localnet"):
+
+- The USDC is a test mint we control, preloaded at the devnet USDC address. It is not Circle's.
+- QuickNode Streams can't reach a local validator, so the **built-in chain watcher** (`src/chainwatch.ts`) polls the chain and feeds the same out-of-band classifier. In the guided demo the leaked-key scene is then a real transaction signed with the raw key, and the watcher has to catch it. Set `LASTLOOK_WATCH=rpc` to use the watcher on devnet too.
+
+### On devnet
+
 Fund the **agent** with devnet SOL ([faucet.solana.com](https://faucet.solana.com)) and devnet USDC ([faucet.circle.com](https://faucet.circle.com) → Solana Devnet). Fund the **seller** with devnet SOL, since it pays x402 network fees.
 
 | Command | What it does |
 |---|---|
+| `npm run local` | Everything on a local validator with pre-funded wallets (no faucets) |
 | `npm run agent` | Research agent: reads a page, buys data over x402, checks Gemini odds |
 | `npm run agent -- --naive` | Same, simulating an agent that trusts injected instructions (the attack demo) |
 | `npm run agent -- --trade` | Also lets it place a ~$2 sandbox order (lands in *ask*) |
@@ -200,10 +217,11 @@ Pages: `/` (landing), `/personal.html` (individuals), `/firewall.html` (agent fi
 
 | Verified | Not yet verified |
 |---|---|
-| Policy (13 tests), policy preview (6 tests), watchdog (6 tests), audit receipts (8 tests), filter on real devnet transactions | A full funded run on devnet (wallets need faucet funds) |
+| Policy (13 tests), policy preview (6 tests), watchdog (6 tests), audit receipts (8 tests), filter on real devnet transactions | A funded run on **devnet** (wallets need faucet funds; the funded run below is on a local validator) |
 | Real x402 payment transactions decoded through the firewall signer | Claude agent loop against the live API (needs `ANTHROPIC_API_KEY`) |
 | Gemini public market data, order validation, approval flow | Gemini sandbox order signing (needs sandbox keys) |
 | Webhook verification and dashboard alert (simulated event) | A live QuickNode Stream delivering to the webhook |
-| Red team: 12 of 12 attacks stopped through the real signing door on devnet | Receipt memos landing on-chain (the agent wallet needs devnet SOL for fees) |
-| Guided demo: 6 of 6 scenes behave as expected with an unfunded wallet (blocks, alert, freeze, approvals) | Guided demo with a funded wallet (auto-approved payment landing on devnet) |
-| Audit report export; `audit:verify` passes a real report and fails a tampered one | `audit:verify` on-chain lookup (needs anchored receipts) |
+| Red team: 12 of 12 attacks stopped through the real signing door, on devnet and on a local validator | |
+| Guided demo on a local validator with funded wallets: 6 of 6 scenes, payments landed on-chain, a real raw-key spend caught by the chain watcher | The same guided demo on devnet |
+| Receipts anchored on-chain as memos on a local validator (15 of 15) | Receipt memos on devnet (the agent wallet needs devnet SOL) |
+| `audit:verify` confirms every memo on-chain, and fails a tampered report and a swapped anchor | |

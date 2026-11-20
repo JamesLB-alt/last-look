@@ -1,7 +1,7 @@
 // Live wallet + security-health data for the dashboard. Everything here is read
 // from devnet or from the firewall's real state: no placeholder numbers.
 import { address, type Address } from "@solana/kit";
-import { USDC_DECIMALS } from "./config.ts";
+import { NETWORK, USDC_DECIMALS } from "./config.ts";
 import type { Firewall } from "./firewall/firewall.ts";
 import { ataFor } from "./firewall/firewall.ts";
 import { rpc } from "./firewall/simulate.ts";
@@ -33,7 +33,7 @@ export async function walletSnapshot(fw: Firewall, trusted: Trusted[]) {
   ]);
   return {
     address: fw.address,
-    network: "Solana Devnet",
+    network: NETWORK.name,
     sol,
     usdc: acct?.usdc ?? 0,
     delegate: acct?.delegate ? { address: acct.delegate, usdc: acct.delegatedUsdc } : null,
@@ -46,7 +46,7 @@ export async function walletSnapshot(fw: Firewall, trusted: Trusted[]) {
 
 type Check = { id: string; label: string; status: "ok" | "warn" | "fail"; detail: string; weight: number };
 
-export function healthReport(fw: Firewall, w: Awaited<ReturnType<typeof walletSnapshot>>, watchdog: { connected: boolean; lastEventAt: string | null }) {
+export function healthReport(fw: Firewall, w: Awaited<ReturnType<typeof walletSnapshot>>, watchdog: { connected: boolean; lastEventAt: string | null; source?: string }) {
   const p = fw.policy;
   const checks: Check[] = [
     {
@@ -85,7 +85,7 @@ export function healthReport(fw: Firewall, w: Awaited<ReturnType<typeof walletSn
       status: watchdog.connected ? "ok" : "warn",
       label: "Out-of-band watchdog",
       detail: watchdog.connected
-        ? `QuickNode Stream live${watchdog.lastEventAt ? `, last event ${new Date(watchdog.lastEventAt).toLocaleTimeString()}` : ""}`
+        ? `${watchdog.source ?? "QuickNode Stream"} live${watchdog.lastEventAt ? `, last event ${new Date(watchdog.lastEventAt).toLocaleTimeString()}` : ""}`
         : "Not connected: money moved outside the firewall wouldn't be noticed",
     },
   ];

@@ -23,7 +23,7 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from "@solana-program/token";
 import { TOKEN_2022_PROGRAM_ADDRESS as TOKEN_2022 } from "@solana-program/token-2022";
-import { USDC_DECIMALS, USDC_MINT } from "./config.ts";
+import { NETWORK, USDC_DECIMALS, USDC_MINT } from "./config.ts";
 import { type Action, decodeWireTransaction } from "./firewall/decode.ts";
 import { ataFor } from "./firewall/firewall.ts";
 import { rpc, simulate } from "./firewall/simulate.ts";
@@ -83,7 +83,7 @@ export async function checkup(addr: string) {
   const score = Math.max(0, 100 - flags.reduce((s, f) => s + penalty[f.severity], 0));
   return {
     address: owner,
-    network: "Solana Devnet",
+    network: NETWORK.name,
     sol,
     tokens: tokens.map(({ delegatedRaw, ...t }) => t),
     activity: { recent: sigs.length, failed, last: sigs[0]?.blockTime ? new Date(Number(sigs[0].blockTime) * 1000).toISOString() : null },

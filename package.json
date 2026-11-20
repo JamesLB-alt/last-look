@@ -11,6 +11,7 @@
     "typecheck": "tsc",
     "seller": "tsx src/seller.ts",
     "dev": "tsx src/dev.ts",
+    "local": "tsx scripts/local.ts",
     "agent": "tsx src/agent.ts",
     "test:filter": "tsx scripts/test-filter.ts",
     "watchdog:selftest": "tsx scripts/watchdog-selftest.ts",
